@@ -139,7 +139,13 @@ export function usePlaybackEngine(activeSong) {
   const tick = useCallback(() => {
     const ctx = audioCtxRef.current;
     if (!ctx) return;
-    const b = (ctx.currentTime - startRef.current) / secPerBeat - countInBeats;
+    // Audio output is delayed by `outputLatency` relative to ctx.currentTime
+    // (often 5–50ms desktop, more on bluetooth/mobile). The visual reads
+    // ctx.currentTime directly, so without compensation the display races
+    // ahead of the audible click. Subtract the latency so the playhead
+    // shows the position of the click currently reaching the speakers.
+    const latency = ctx.outputLatency || ctx.baseLatency || 0;
+    const b = (ctx.currentTime - latency - startRef.current) / secPerBeat - countInBeats;
     if (b >= totalBeats) {
       setElapsedBeats(totalBeats);
       setPlaying(false);
