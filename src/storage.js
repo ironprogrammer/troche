@@ -1,5 +1,4 @@
 import { STORAGE_KEY } from "./constants.js";
-import { defaultLibrary } from "./defaults.js";
 
 // Static-host storage: localStorage when available, in-memory fallback otherwise.
 const memStore = {};
@@ -30,14 +29,16 @@ function set(key, value) {
   memStore[key] = value;
 }
 
+// Returns the saved library, or null when there's nothing in storage yet
+// (so the caller can decide whether to seed a default or use shared payload).
 export async function loadLibrary() {
   try {
     const value = get(STORAGE_KEY);
     if (value) return JSON.parse(value);
   } catch {
-    // no saved data yet, or parse failed
+    // no saved data, or parse failed
   }
-  return defaultLibrary();
+  return null;
 }
 
 export async function saveLibrary(lib) {

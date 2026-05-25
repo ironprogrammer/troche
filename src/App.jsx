@@ -36,27 +36,42 @@ export default function App() {
   const [shareFlash, setShareFlash] = useState(false);
 
   useEffect(() => {
-    // Consume the shared payload (if any) before loading from storage. We
-    // strip the hash regardless of parse success, so the URL is clean either
-    // way.
+    // Consume the shared payload (if any) before loading from storage. The
+    // hash is stripped regardless of parse success so the URL is clean.
     const shared = consumeSharedFromUrl();
     loadLibrary().then((stored) => {
-      let next = stored;
-      let importedDirty = false;
       const incoming = Array.isArray(shared?.songs) ? shared.songs : null;
-      if (incoming && incoming.length) {
+      const hasIncoming = !!(incoming && incoming.length);
+
+      // Three states: storage hit, shared link, or both.
+      //  - storage only             → use it
+      //  - shared only (no storage) → use the shared payload outright (don't seed Rickroll)
+      //  - storage + shared         → merge shared into existing library
+      //  - neither                  → seed the default library (Rickroll)
+      let next;
+      let importedDirty = false;
+      if (hasIncoming) {
         const normalized = incoming.map((s) => ({
           ...defaultSong(s.name),
           ...s,
           id: uid(),
           parts: (s.parts || []).map((p) => ({ ...p, id: uid() })),
         }));
-        next = {
-          songs: [...stored.songs, ...normalized],
-          activeId: normalized[0].id,
-        };
-        importedDirty = true;
+        if (stored) {
+          next = {
+            songs: [...stored.songs, ...normalized],
+            activeId: normalized[0].id,
+          };
+          importedDirty = true; // user has existing data — flag for save
+        } else {
+          // First-time visitor coming in via a share link: skip the demo,
+          // give them just the shared songs.
+          next = { songs: normalized, activeId: normalized[0].id };
+        }
+      } else {
+        next = stored || defaultLibrary();
       }
+
       setLibrary(next);
       if (importedDirty) setDirty(true);
       setLoading(false);
