@@ -21,8 +21,11 @@ export const defaultSong = (name) => ({
 
 // The starter song when no library has been saved yet.
 // Form sized to approximate the radio cut (~3:33 at 113 BPM ≈ 100 bars).
+// The `demo: true` flag marks this as the seeded demo so it can be excluded
+// from share-link payloads. Any user edit clears the flag (see App.updateSong).
 export const rickrollSong = () => ({
   id: uid(),
+  demo: true,
   name: "Never Gonna Give You Up",
   bpm: 113,
   timeSigTop: 4,

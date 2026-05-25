@@ -92,9 +92,14 @@ export default function App() {
   // ---- mutation helpers ----
   const updateSong = useCallback((mutator) => {
     setLibrary((lib) => {
-      const songs = lib.songs.map((s) =>
-        s.id === lib.activeId ? mutator({ ...s }) : s
-      );
+      const songs = lib.songs.map((s) => {
+        if (s.id !== lib.activeId) return s;
+        const next = mutator({ ...s });
+        // Once the user touches the seeded demo it stops being "the demo" —
+        // clearing the flag so it can be shared like any other song.
+        if (next.demo) delete next.demo;
+        return next;
+      });
       return { ...lib, songs };
     });
     setDirty(true);
@@ -246,7 +251,15 @@ export default function App() {
 
   const handleShare = async () => {
     if (!library) return;
-    const url = buildShareUrl(library.songs);
+    // Exclude the seeded demo from share links so it doesn't propagate to
+    // recipients. Once the user has edited it, the demo flag clears and it
+    // shares normally.
+    const shareable = library.songs.filter((s) => !s.demo);
+    if (!shareable.length) {
+      window.alert("Nothing to share — your library is just the demo song. Add or edit a song first.");
+      return;
+    }
+    const url = buildShareUrl(shareable);
     // ~12KB is the largest URL most chat apps reliably preserve in copy/paste.
     if (url.length > 12000) {
       const proceed = window.confirm(
