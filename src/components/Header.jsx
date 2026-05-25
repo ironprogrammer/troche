@@ -20,7 +20,8 @@ export function Header({
   library, activeSong, playing, dirty, saving, savedFlash,
   fileInputRef,
   onSwitch, onNew, onDelete, onExportLibrary, onExportSong, onImport,
-  onSave, onReset, onShare, shareFlash, setField, updateSong,
+  onSave, onReset, onShare, shareFlash, lengthLabel, barsLabel,
+  setField, updateSong,
 }) {
   // Hold Alt/Option to reveal the destructive "Reset" button.
   const [altHeld, setAltHeld] = useState(false);
@@ -61,14 +62,22 @@ export function Header({
               onClick={onReset}
               title="Clear all saved songs from this browser"
             >
-              <Trash2 size={15} /> Reset
+              <Trash2 size={15} /> <span className="sa-btn-text">Reset</span>
             </button>
           )}
-          <button className="sa-btn ghost" onClick={() => fileInputRef.current?.click()}>
-            <Upload size={15} /> Import
+          <button
+            className="sa-btn ghost"
+            onClick={() => fileInputRef.current?.click()}
+            title="Import a .troche.json file"
+          >
+            <Upload size={15} /> <span className="sa-btn-text">Import</span>
           </button>
-          <button className="sa-btn ghost" onClick={onExportSong}>
-            <Download size={15} /> Export
+          <button
+            className="sa-btn ghost"
+            onClick={onExportSong}
+            title="Download this song as JSON"
+          >
+            <Download size={15} /> <span className="sa-btn-text">Export</span>
           </button>
           <button
             className="sa-btn ghost"
@@ -76,12 +85,13 @@ export function Header({
             title="Copy a link that imports this library"
           >
             {shareFlash ? <Check size={15} /> : <Share2 size={15} />}
-            {shareFlash ? "Link copied" : "Share"}
+            <span className="sa-btn-text">{shareFlash ? "Link copied" : "Share"}</span>
           </button>
           <button
             className={`sa-btn primary ${dirty && !saving ? "" : "muted"}`}
             onClick={onSave}
             disabled={!dirty || saving}
+            title={dirty ? "Save library" : "Library saved"}
           >
             {saving ? (
               <Loader2 size={15} className="sa-spin" />
@@ -90,7 +100,9 @@ export function Header({
             ) : (
               <Save size={15} />
             )}
-            {saving ? "Saving…" : savedFlash ? "Saved" : dirty ? "Save" : "Saved"}
+            <span className="sa-btn-text">
+              {saving ? "Saving…" : savedFlash ? "Saved" : dirty ? "Save" : "Saved"}
+            </span>
           </button>
           <input
             ref={fileInputRef}
@@ -168,6 +180,12 @@ export function Header({
                 <option key={n} value={n}>{n} {n === 1 ? "bar" : "bars"}</option>
               ))}
             </select>
+          </div>
+        </MetaField>
+        <MetaField label="Length">
+          <div className="sa-length">
+            <span className="sa-length-time">{lengthLabel}</span>
+            <span className="sa-length-bars">{barsLabel}</span>
           </div>
         </MetaField>
       </div>

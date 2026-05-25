@@ -48,14 +48,6 @@ export const styles = {
     color: "var(--ink-dim)", fontWeight: 600,
   },
   countInField: { display: "flex", alignItems: "center", gap: 8 },
-  totals: {
-    marginLeft: "auto",
-    display: "flex", gap: 8, alignItems: "center",
-    fontFamily: "'Spline Sans Mono', monospace",
-    fontSize: 13, color: "var(--ink-dim)",
-    whiteSpace: "nowrap",
-    flexShrink: 0,
-  },
   transport: {
     display: "flex", alignItems: "center", gap: 16,
     padding: "16px 18px",
@@ -175,6 +167,20 @@ select.sa-input { padding-right: 28px; appearance: none; -webkit-appearance: non
 .sa-input.sample { flex: 1; font-size: 13px; }
 .sa-btn.danger { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 30%, var(--line)); }
 .sa-btn.danger:hover { border-color: var(--accent); background: rgba(216,72,59,.06); }
+
+/* Length is a derived read-only display, sized to feel like the other meta
+   fields. Bars is dropped on narrow screens since the user told us it's
+   nice-to-have, not essential. */
+.sa-length {
+  display: flex; align-items: baseline; gap: 8px;
+  height: 36px;
+  padding: 7px 10px;
+  font-family: 'Spline Sans Mono', monospace; font-size: 15px;
+  color: var(--ink);
+  border: 1px solid transparent;
+}
+.sa-length-time { font-variant-numeric: tabular-nums; }
+.sa-length-bars { font-size: 12px; color: var(--ink-dim); }
 
 .sa-play {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
@@ -448,5 +454,12 @@ input[type=number]::-webkit-inner-spin-button { opacity: .4; }
   .sa-status .cell b { font-size: 24px; }
   .sa-status .beatgroup { gap: 12px; }
   .sa-input.name { width: 100%; min-width: 160px; }
+  /* icon-only header buttons on narrow screens — text takes too much room
+     and we need Import/Export/Share/Save to all fit on one line */
+  .sa-btn-text { display: none; }
+  .sa-btn { padding: 7px 10px; }
+  /* drop the bars sub-label; the time is the part that matters */
+  .sa-length-bars { display: none; }
+  .sa-length { gap: 0; padding: 7px 4px; }
 }
 `;

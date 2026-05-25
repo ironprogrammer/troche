@@ -4,11 +4,8 @@ import { styles } from "../styles.js";
 export function Transport({
   playing, togglePlay, metronome, setMetronome,
   inCountIn, activePartId, curMeasure, curBeat, ciBeat,
-  totalBeats, totalMeasures, totalSeconds,
+  totalBeats,
 }) {
-  const mm = Math.floor(totalSeconds / 60);
-  const ss = Math.round(totalSeconds % 60).toString().padStart(2, "0");
-
   return (
     <div style={styles.transport}>
       <button
@@ -30,7 +27,7 @@ export function Transport({
       </button>
 
       <div style={styles.statusWrap}>
-        {playing && (inCountIn || activePartId) ? (
+        {playing && (inCountIn || activePartId) && (
           <div className={`sa-status ${inCountIn ? "countin" : "live"}`}>
             <span className="beatgroup">
               <span className="cell">
@@ -44,17 +41,7 @@ export function Transport({
             </span>
             <span className={`tag ${inCountIn ? "" : "hidden"}`}>COUNT-IN</span>
           </div>
-        ) : (
-          <div className="sa-status idle">
-            <span>ready</span>
-          </div>
         )}
-      </div>
-
-      <div style={styles.totals}>
-        <span>{totalMeasures} bars</span>
-        <span className="dot">·</span>
-        <span>{mm}:{ss}</span>
       </div>
     </div>
   );

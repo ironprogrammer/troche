@@ -399,6 +399,10 @@ export default function App() {
 
   const totalMeasures = activeSong.parts.reduce((s, p) => s + p.measures, 0);
   const totalSeconds = totalBeats * secPerBeat;
+  const mm = Math.floor(totalSeconds / 60);
+  const ss = Math.round(totalSeconds % 60).toString().padStart(2, "0");
+  const lengthLabel = `${mm}:${ss}`;
+  const barsLabel = `${totalMeasures} bars`;
 
   return (
     <div style={styles.root}>
@@ -423,6 +427,8 @@ export default function App() {
           onReset={handleReset}
           onShare={handleShare}
           shareFlash={shareFlash}
+          lengthLabel={lengthLabel}
+          barsLabel={barsLabel}
           setField={setField}
           updateSong={updateSong}
         />
@@ -438,8 +444,6 @@ export default function App() {
           curBeat={curBeat}
           ciBeat={ciBeat}
           totalBeats={totalBeats}
-          totalMeasures={totalMeasures}
-          totalSeconds={totalSeconds}
         />
       </div>
 
