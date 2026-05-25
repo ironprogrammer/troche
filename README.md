@@ -36,7 +36,7 @@ Named in a nod toward Lozenger, my band's informal name.
 - React 19
 - [lucide-react](https://lucide.dev) for icons
 - Vite (dev server + static build)
-- No backend; persists to `localStorage`.
+- No backend; persists to `localStorage`
 
 ## Develop locally
 
@@ -67,25 +67,6 @@ Vite's `base` in `vite.config.js` is set to `/troche/` to match the repo
 name. If you fork under a different name (or move to a custom domain at the
 root), update `base` accordingly.
 
-## Project layout
-
-```
-src/
-  App.jsx                  composition + library/part state
-  main.jsx                 React entry
-  constants.js             palette, time-sig list, storage key
-  defaults.js              factory for a new song / library
-  storage.js               localStorage (+ in-memory fallback)
-  styles.js                inline layout styles + CSS string
-  utils.js                 uid, clampNum, sigKey, partSig
-  hooks/
-    usePlaybackEngine.js   audio scheduler, transport, derived display
-  components/
-    Header.jsx             top chrome + song meta fields
-    SongSwitcher.jsx       library dropdown
-    Transport.jsx          play / metronome / status / totals
-    PartBlock.jsx          one arrangement block (incl. drag + editor)
-```
 
 ## Notes / known limitations
 
