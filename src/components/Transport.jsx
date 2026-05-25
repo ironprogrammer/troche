@@ -4,7 +4,7 @@ import { styles } from "../styles.js";
 export function Transport({
   playing, togglePlay, metronome, setMetronome,
   inCountIn, activePartId, curMeasure, curBeat, ciBeat,
-  totalBeats, totalMeasures, totalSeconds, countInActive, countInBars,
+  totalBeats, totalMeasures, totalSeconds,
 }) {
   const mm = Math.floor(totalSeconds / 60);
   const ss = Math.round(totalSeconds % 60).toString().padStart(2, "0");
@@ -46,11 +46,7 @@ export function Transport({
           </div>
         ) : (
           <div className="sa-status idle">
-            {countInActive ? (
-              <span>{countInBars || 1}-bar count-in armed</span>
-            ) : (
-              <span>ready</span>
-            )}
+            <span>ready</span>
           </div>
         )}
       </div>

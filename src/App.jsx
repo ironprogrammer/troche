@@ -20,6 +20,7 @@ export default function App() {
 
   const partRefs = useRef({});
   const fileInputRef = useRef(null);
+  const stickyRef = useRef(null);
 
   // undo stash for a removed part
   const [undo, setUndo] = useState(null); // { part, index, songId }
@@ -347,13 +348,23 @@ export default function App() {
     e.target.value = "";
   };
 
-  // auto-scroll active part into view
+  // Auto-scroll active part into view. We can't use scrollIntoView({block:
+  // "center"}) directly — it centers against the whole viewport and ignores
+  // our sticky header, parking the part under the chrome on mobile (where
+  // the meta row wraps and the sticky gets tall). Center in the area below
+  // the sticky instead by measuring it at scroll time.
   useEffect(() => {
-    if (playing && activePartId && partRefs.current[activePartId]) {
-      partRefs.current[activePartId].scrollIntoView({
-        behavior: "smooth",
-        block: "center",
-      });
+    if (!playing || !activePartId) return;
+    const el = partRefs.current[activePartId];
+    if (!el) return;
+    const stickyH = stickyRef.current?.offsetHeight || 0;
+    const availH = window.innerHeight - stickyH;
+    const elRect = el.getBoundingClientRect();
+    const desiredCenter = stickyH + availH / 2;
+    const currentCenter = elRect.top + elRect.height / 2;
+    const delta = currentCenter - desiredCenter;
+    if (Math.abs(delta) > 4) {
+      window.scrollBy({ top: delta, behavior: "smooth" });
     }
   }, [activePartId, playing]);
 
@@ -393,7 +404,7 @@ export default function App() {
     <div style={styles.root}>
       <style>{css}</style>
 
-      <div style={styles.stickyTop}>
+      <div ref={stickyRef} style={styles.stickyTop}>
         <Header
           library={library}
           activeSong={activeSong}
@@ -429,8 +440,6 @@ export default function App() {
           totalBeats={totalBeats}
           totalMeasures={totalMeasures}
           totalSeconds={totalSeconds}
-          countInActive={countInActive}
-          countInBars={activeSong.countInBars}
         />
       </div>
 
