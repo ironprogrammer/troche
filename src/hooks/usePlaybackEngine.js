@@ -162,22 +162,45 @@ export function usePlaybackEngine(activeSong) {
       return;
     }
     if (totalBeats <= 0) return;
-    // create/resume the audio context within the user gesture (autoplay policy)
+    // Create/resume the audio context within the user gesture (autoplay policy).
     if (!audioCtxRef.current) {
       audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
     }
     const ctx = audioCtxRef.current;
-    if (ctx.state === "suspended") ctx.resume();
 
-    // if at/past the end, restart from the top; otherwise resume in place
     const atEnd = elapsedBeats >= totalBeats;
     const begin = !atEnd && elapsedBeats > 0 ? elapsedBeats : -countInBeats;
-    startRef.current = ctx.currentTime - (begin + countInBeats) * secPerBeat;
-    nextBeatRef.current = Math.ceil(begin - 1e-9);
-    setElapsedBeats(begin);
-    setPlaying(true);
-    runScheduler();
-    schedulerRef.current = setInterval(runScheduler, 25);
+
+    const startSequence = () => {
+      // Prime the output pipeline with a silent buffer. On a freshly-resumed
+      // context the audio subsystem can take ~1s to start delivering samples,
+      // which silently swallows the first few clicks. The prime wakes it up.
+      const prime = ctx.createOscillator();
+      const g = ctx.createGain();
+      g.gain.value = 0;
+      prime.connect(g).connect(ctx.destination);
+      prime.start();
+      prime.stop(ctx.currentTime + 0.02);
+
+      // Anchor with a small lead so the first real click is unambiguously in
+      // the future relative to ctx.currentTime, even after scheduler latency.
+      const lead = 0.08;
+      startRef.current = ctx.currentTime + lead - (begin + countInBeats) * secPerBeat;
+      nextBeatRef.current = Math.ceil(begin - 1e-9);
+      setElapsedBeats(begin);
+      setPlaying(true);
+      runScheduler();
+      schedulerRef.current = setInterval(runScheduler, 25);
+    };
+
+    // Wait for the resume promise to actually resolve before anchoring —
+    // ctx.currentTime is 0 (or stale) on a suspended context and would jump
+    // forward when resume completes, leaving startRef in the past.
+    if (ctx.state === "suspended") {
+      ctx.resume().then(startSequence);
+    } else {
+      startSequence();
+    }
   };
 
   useEffect(() => {
