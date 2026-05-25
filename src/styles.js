@@ -272,12 +272,14 @@ select.sa-input { padding-right: 28px; appearance: none; -webkit-appearance: non
 .sa-toast-btn:hover { background: rgba(255,255,255,.28); }
 
 /* ---- block ---- */
-/* Resting background uses a very subtle tint so each part's identity color is
-   visible even when nothing is playing. The progress fill on top is materially
-   more saturated so it reads clearly as it sweeps L→R. */
+/* Resting background is just a hint of the part's identity color. The
+   progress fill on top is materially more saturated so it reads clearly as
+   it sweeps L→R. No CSS width transition — we already update width every
+   RAF frame; a transition on top adds lag and can stutter against the
+   per-frame writes. */
 .sa-block {
   position: relative;
-  background: color-mix(in srgb, var(--clr) 6%, var(--card));
+  background: color-mix(in srgb, var(--clr) 4%, var(--card));
   border: 1px solid color-mix(in srgb, var(--clr) 22%, var(--line));
   border-left: 4px solid var(--clr);
   border-radius: 12px;
@@ -297,12 +299,11 @@ select.sa-input { padding-right: 28px; appearance: none; -webkit-appearance: non
 
 .sa-block-fill {
   position: absolute; inset: 0 auto 0 0;
-  background: var(--clr); opacity: .26;
-  transition: width .08s linear;
+  background: var(--clr); opacity: .40;
   pointer-events: none;
 }
 .sa-block.active .sa-block-fill {
-  opacity: .42;
+  opacity: .58;
   border-right: 3px solid var(--clr);
   box-shadow: 0 0 12px color-mix(in srgb, var(--clr) 45%, transparent);
 }
