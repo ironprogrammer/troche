@@ -99,14 +99,6 @@ export const PartBlock = React.forwardRef(function PartBlock(
       />
 
       <div className="sa-block-inner">
-        <div
-          className={`sa-grip ${playing ? "disabled" : ""}`}
-          title={playing ? "Stop playback to reorder" : "Drag to reorder"}
-          onPointerDown={playing ? undefined : onGripPointerDown}
-        >
-          <GripVertical size={18} />
-        </div>
-
         <NumberInput
           className="sa-measures"
           min={1}
@@ -159,6 +151,14 @@ export const PartBlock = React.forwardRef(function PartBlock(
             <span className="sa-swatch" style={{ background: part.color }} />
             <Settings2 size={15} />
           </button>
+        </div>
+
+        <div
+          className={`sa-grip ${playing ? "disabled" : ""}`}
+          title={playing ? "Stop playback to reorder" : "Drag to reorder"}
+          onPointerDown={playing ? undefined : onGripPointerDown}
+        >
+          <GripVertical size={18} />
         </div>
       </div>
 

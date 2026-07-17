@@ -20,7 +20,7 @@ export function Header({
   library, activeSong, playing, dirty, saving, savedFlash,
   fileInputRef,
   onSwitch, onNew, onDelete, onExportLibrary, onExportSong, onImport,
-  onSave, onReset, onShare, shareFlash, lengthLabel, barsLabel,
+  onSave, onReset, onShare, shareFlash,
   setField, updateSong,
 }) {
   // Hold Alt/Option to reveal the destructive "Reset" button.
@@ -114,7 +114,7 @@ export function Header({
         </div>
       </div>
 
-      <div style={styles.metaRow}>
+      <div className="sa-metarow">
         <MetaField label="Song">
           <input
             className="sa-input name"
@@ -180,12 +180,6 @@ export function Header({
                 <option key={n} value={n}>{n} {n === 1 ? "bar" : "bars"}</option>
               ))}
             </select>
-          </div>
-        </MetaField>
-        <MetaField label="Length">
-          <div className="sa-length">
-            <span className="sa-length-time">{lengthLabel}</span>
-            <span className="sa-length-bars">{barsLabel}</span>
           </div>
         </MetaField>
       </div>

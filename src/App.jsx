@@ -250,6 +250,37 @@ export default function App() {
     }
   };
 
+  // Auto-save. Storage is local + synchronous (localStorage), so there's no
+  // reason to make the user press Save — we debounce writes until edits
+  // settle, then flush and clear the dirty flag. The Save button in the
+  // header stays as a passive "Saved" status indicator.
+  useEffect(() => {
+    if (!dirty || !library) return;
+    const t = setTimeout(async () => {
+      setSaving(true);
+      const ok = await saveLibrary(library);
+      setSaving(false);
+      if (ok) {
+        setDirty(false);
+        setSavedFlash(true);
+        setTimeout(() => setSavedFlash(false), 1400);
+      }
+    }, 800);
+    return () => clearTimeout(t);
+  }, [dirty, library]);
+
+  // Belt-and-suspenders for the rare case the tab is closed inside the debounce
+  // window before the auto-save has flushed.
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (e) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [dirty]);
+
   const handleShare = async () => {
     if (!library) return;
     // Exclude the seeded demo from share links so it doesn't propagate to
@@ -427,8 +458,6 @@ export default function App() {
           onReset={handleReset}
           onShare={handleShare}
           shareFlash={shareFlash}
-          lengthLabel={lengthLabel}
-          barsLabel={barsLabel}
           setField={setField}
           updateSong={updateSong}
         />
@@ -444,6 +473,8 @@ export default function App() {
           curBeat={curBeat}
           ciBeat={ciBeat}
           totalBeats={totalBeats}
+          lengthLabel={lengthLabel}
+          barsLabel={barsLabel}
         />
       </div>
 

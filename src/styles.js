@@ -34,30 +34,12 @@ export const styles = {
   // visual styling moved to .sa-brand in css so we can do the hover flip
   brandMark: {},
   chromeActions: { display: "flex", gap: 8, flexWrap: "wrap" },
-  metaRow: {
-    display: "flex",
-    alignItems: "flex-end",
-    justifyContent: "center",
-    gap: 18,
-    padding: "12px 18px 14px",
-    flexWrap: "wrap",
-  },
   metaField: { display: "flex", flexDirection: "column", gap: 4 },
   metaLabel: {
     fontSize: 10, letterSpacing: ".14em", textTransform: "uppercase",
     color: "var(--ink-dim)", fontWeight: 600,
   },
   countInField: { display: "flex", alignItems: "center", gap: 8 },
-  transport: {
-    display: "flex", alignItems: "center", gap: 16,
-    padding: "16px 18px",
-    maxWidth: 760, margin: "0 auto",
-  },
-  statusWrap: {
-    flex: 1,
-    display: "flex", alignItems: "center",
-    minHeight: 48,
-  },
   sheet: {
     maxWidth: 760,
     margin: "0 auto",
@@ -168,19 +150,30 @@ select.sa-input { padding-right: 28px; appearance: none; -webkit-appearance: non
 .sa-btn.danger { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 30%, var(--line)); }
 .sa-btn.danger:hover { border-color: var(--accent); background: rgba(216,72,59,.06); }
 
-/* Length is a derived read-only display, sized to feel like the other meta
-   fields. Bars is dropped on narrow screens since the user told us it's
-   nice-to-have, not essential. */
-.sa-length {
+/* Length is a derived read-only display. It used to be a meta-row field that
+   wrapped onto its own line on mobile (eating vertical space); it now lives in
+   the transport's status area, which is empty until playback starts. Bars is
+   dropped on narrow screens — the time is the part that matters. */
+.sa-length-inline {
   display: flex; align-items: baseline; gap: 8px;
-  height: 36px;
-  padding: 7px 10px;
   font-family: 'Spline Sans Mono', monospace; font-size: 15px;
   color: var(--ink);
-  border: 1px solid transparent;
 }
 .sa-length-time { font-variant-numeric: tabular-nums; }
 .sa-length-bars { font-size: 12px; color: var(--ink-dim); }
+
+.sa-metarow {
+  display: flex; align-items: flex-end; justify-content: center;
+  gap: 18px; padding: 12px 18px 14px; flex-wrap: wrap;
+}
+.sa-transport {
+  display: flex; align-items: center; gap: 16px;
+  padding: 16px 18px;
+  max-width: 760px; margin: 0 auto;
+}
+.sa-statuswrap {
+  flex: 1; display: flex; align-items: center; min-height: 48px;
+}
 
 .sa-play {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
@@ -460,6 +453,9 @@ input[type=number]::-webkit-inner-spin-button { opacity: .4; }
   .sa-btn { padding: 7px 10px; }
   /* drop the bars sub-label; the time is the part that matters */
   .sa-length-bars { display: none; }
-  .sa-length { gap: 0; padding: 7px 4px; }
+  /* tighten the header bands so form blocks get more room */
+  .sa-metarow { gap: 10px; padding: 8px 18px 10px; }
+  .sa-transport { padding: 8px 18px; gap: 12px; }
+  .sa-statuswrap { min-height: 40px; }
 }
 `;
