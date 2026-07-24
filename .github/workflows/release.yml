@@ -1,0 +1,41 @@
+name: Release
+
+# Build the app and attach an installable plugin zip to a GitHub Release
+# whenever a version tag is pushed, e.g. `git tag v1.0.0 && git push --tags`.
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build app and sync into the plugin
+        run: npm run build:wp
+
+      - name: Package plugin zip
+        working-directory: wp-plugin
+        run: npx --yes @wordpress/scripts plugin-zip
+
+      - name: Create release and upload zip
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh release create "$GITHUB_REF_NAME"
+          wp-plugin/troche.zip
+          --title "$GITHUB_REF_NAME"
+          --generate-notes
