@@ -113,6 +113,7 @@ export const css = `
 .sa-savestate.pending { color: var(--ink); }
 .sa-savestate.offline { color: #b0692c; }
 .sa-savestate.expired { color: var(--accent); }
+.sa-savestate.stale { color: var(--accent); }
 /* Clickable states (Unsaved → save now, Offline → retry) read as actions. */
 .sa-savestate.clickable { cursor: pointer; }
 .sa-savestate.clickable.pending { color: var(--accent); }

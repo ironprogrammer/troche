@@ -75,8 +75,22 @@ export default function App() {
     // hash is stripped regardless of parse success so the URL is clean.
     const shared = consumeSharedFromUrl();
     loadLibrary().then((stored) => {
-      const incoming = Array.isArray(shared?.songs) ? shared.songs : null;
-      const hasIncoming = !!(incoming && incoming.length);
+      let incoming = Array.isArray(shared?.songs) ? shared.songs : null;
+      let hasIncoming = !!(incoming && incoming.length);
+
+      // A share link in WP mode writes into the shared band library on the next
+      // autosave, so a crafted link could silently inject songs for everyone.
+      // Confirm before merging; discard the payload on cancel.
+      if (hasIncoming && wpMode) {
+        const n = incoming.length;
+        const ok = window.confirm(
+          `Add ${n} shared song${n === 1 ? "" : "s"} to the band library?`
+        );
+        if (!ok) {
+          incoming = null;
+          hasIncoming = false;
+        }
+      }
 
       // Three states: storage hit, shared link, or both.
       //  - storage only             → use it
@@ -328,6 +342,8 @@ export default function App() {
         adoptWpIds(res.assignedIds);
       } else if (res.authExpired) {
         setWpStatus("expired");
+      } else if (res.stale) {
+        setWpStatus("stale");
       } else if (res.offline) {
         setWpStatus("offline");
       }
@@ -538,6 +554,8 @@ export default function App() {
       ? "saving"
       : wpStatus === "expired"
       ? "expired"
+      : wpStatus === "stale"
+      ? "stale"
       : wpStatus === "offline"
       ? "offline"
       : dirty
@@ -581,6 +599,7 @@ export default function App() {
           isMobile={isMobile}
           saveState={saveState}
           loginUrl={loginUrl}
+          onReload={() => window.location.reload()}
         />
 
         <Transport

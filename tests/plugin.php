@@ -86,6 +86,31 @@ check( 'library now has 1 song', 1 === count( $data['songs'] ) );
 check( 'song carries wpId', ( $data['songs'][0]['wpId'] ?? 0 ) === $wp_id );
 check( 'unicode key round-trips', 'A♭' === ( $data['songs'][0]['musicalKey'] ?? '' ) );
 
+// ---- wp-admin cap mapping (post-type actions gate on troche_edit, not core post caps) ----
+$editor_id = wp_insert_user(
+	array(
+		'user_login' => 'bandeditor',
+		'user_pass'  => wp_generate_password(),
+		'user_email' => 'bandeditor@example.test',
+		'role'       => 'editor',
+	)
+);
+check( 'editor lacks troche_edit', ! is_wp_error( $editor_id ) && ! user_can( $editor_id, 'troche_edit' ) );
+// A core Editor has edit_others_posts/delete_others_posts, which before the cap
+// mapping let them edit or trash songs at edit.php?post_type=troche_song without
+// troche_edit and bypassing sanitize_song(). The mapping closes that.
+check( 'editor cannot edit a song in wp-admin', ! user_can( $editor_id, 'edit_post', $wp_id ) );
+check( 'editor cannot trash a song in wp-admin', ! user_can( $editor_id, 'delete_post', $wp_id ) );
+// The song-list screen (edit.php) gates on the post type's edit_posts cap,
+// which the mapping resolves to troche_edit.
+$list_cap = get_post_type_object( 'troche_song' )->cap->edit_posts;
+check( 'song list cap maps to troche_edit', 'troche_edit' === $list_cap );
+check( 'editor cannot open the song list', ! user_can( $editor_id, $list_cap ) );
+// Holders of troche_edit (admins, checked bandmates) keep full wp-admin access,
+// so revision restore still works.
+check( 'admin can edit a song in wp-admin (revision restore)', user_can( $admin_id, 'edit_post', $wp_id ) );
+check( 'capped subscriber can edit a song in wp-admin', user_can( $sub_id, 'edit_post', $wp_id ) );
+
 // ---- update + revision ----
 $song['name'] = 'Renamed Song';
 $song['wpId'] = $wp_id;

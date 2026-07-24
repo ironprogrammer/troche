@@ -22,13 +22,14 @@ function MetaField({ label, children }) {
 // The autosave status indicator that replaces the Save button in WP mode.
 // "Unsaved" and "Offline" are clickable to save immediately (skip the debounce
 // / retry); the rest are passive, and "Session expired" is a login link.
-function StatusPill({ state, loginUrl, onSave }) {
+function StatusPill({ state, loginUrl, onSave, onReload }) {
   const map = {
     saving: { icon: <Loader2 size={15} className="sa-spin" />, label: "Saving…" },
     saved: { icon: <Check size={15} />, label: "Saved" },
     pending: { icon: <Save size={15} />, label: "Save now" },
     offline: { icon: <WifiOff size={15} />, label: "Offline — changes kept locally" },
     expired: { icon: <TriangleAlert size={15} />, label: "Session expired" },
+    stale: { icon: <TriangleAlert size={15} />, label: "Reload before saving" },
     viewonly: { icon: <Eye size={15} />, label: "View only" },
   };
   const s = map[state] || map.saved;
@@ -38,6 +39,18 @@ function StatusPill({ state, loginUrl, onSave }) {
       <a className="sa-savestate expired" href={loginUrl} title="Your session expired — log in again. Your changes are kept locally.">
         <TriangleAlert size={15} /> <span className="sa-btn-text">Session expired — log in</span>
       </a>
+    );
+  }
+
+  if (state === "stale" && onReload) {
+    return (
+      <button
+        className="sa-savestate stale clickable"
+        onClick={onReload}
+        title="Your library looks out of date — reload to sync before saving. Your changes are kept locally."
+      >
+        {s.icon} <span className="sa-btn-text">{s.label}</span>
+      </button>
     );
   }
 
@@ -66,7 +79,7 @@ export function Header({
   onSwitch, onNew, onDelete, onExportLibrary, onExportSong, onImport,
   onSave, onReset, onShare, shareFlash,
   setField, updateSong,
-  wpMode, isMobile, saveState, loginUrl,
+  wpMode, isMobile, saveState, loginUrl, onReload,
 }) {
   // WP mode on a phone drops the Share/Export/Import row: autosave makes it
   // redundant and the row costs a full line of scarce vertical space. It stays
@@ -239,7 +252,7 @@ export function Header({
             </>
           )}
           {wpMode ? (
-            <StatusPill state={saveState} loginUrl={loginUrl} onSave={onSave} />
+            <StatusPill state={saveState} loginUrl={loginUrl} onSave={onSave} onReload={onReload} />
           ) : (
             <button
               className={`sa-btn primary ${dirty && !saving ? "" : "muted"}`}

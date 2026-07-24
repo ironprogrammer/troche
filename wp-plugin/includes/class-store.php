@@ -67,8 +67,26 @@ class Store {
 				'show_in_menu'        => false,
 				'show_in_rest'        => false,
 				'supports'            => array( 'title', 'editor', 'revisions', 'author' ),
-				'capability_type'     => 'post',
-				'map_meta_cap'        => true,
+				// Gate every wp-admin action on this post type behind troche_edit,
+				// not core post caps. Without this, an Editor (edit_others_posts)
+				// or an Author (own posts) could edit or trash songs from
+				// edit.php?post_type=troche_song — bypassing troche_edit and the
+				// REST layer's sanitize_song(). map_meta_cap is off so the meta
+				// caps below are checked literally rather than remapped to 'post'.
+				'capability_type'     => self::POST_TYPE,
+				'map_meta_cap'        => false,
+				'capabilities'        => array(
+					'edit_post'           => self::CAP_EDIT,
+					'read_post'           => self::CAP_EDIT,
+					'delete_post'         => self::CAP_EDIT,
+					'edit_posts'          => self::CAP_EDIT,
+					'edit_others_posts'   => self::CAP_EDIT,
+					'publish_posts'       => self::CAP_EDIT,
+					'read_private_posts'  => self::CAP_EDIT,
+					'delete_posts'        => self::CAP_EDIT,
+					'delete_others_posts' => self::CAP_EDIT,
+					'create_posts'        => self::CAP_EDIT,
+				),
 			)
 		);
 

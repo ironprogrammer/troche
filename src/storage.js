@@ -126,6 +126,12 @@ async function wpFetch(path, method, body, keepalive) {
 // Thrown to unwind a save when the session/nonce is no longer valid.
 class AuthError extends Error {}
 
+// Thrown to abort the destructive phase of a save when the client's view of the
+// library looks stale — an empty client against a non-empty server, or a diff
+// that would trash the bulk of it. Recoverable: the caller surfaces a "reload"
+// state and a fresh load rebuilds the snapshot.
+class StaleSnapshotError extends Error {}
+
 async function loadFromWp() {
   const res = await wpFetch("/library", "GET");
   if (res.status === 401 || res.status === 403) throw new AuthError();
@@ -179,9 +185,22 @@ async function doWpSave(library, keepalive) {
     }
   }
 
+  // Tripwire before the destructive phase. A stale or reset client can present
+  // a library that would trash most of the server's songs in one diff; refuse
+  // to and ask the user to reload instead. Creates/updates above have already
+  // landed (they're additive and safe) — only the deletes are held back.
+  // Everything is trash-not-delete, but this avoids relying on the 30-day trash
+  // window to notice. Trips when the client is empty against a non-empty server,
+  // or when a save would trash a majority of a snapshot of at least three songs.
+  const toTrash = Array.from(serverSnapshot.keys()).filter((wpId) => !seenWpIds.has(wpId));
+  const emptyClientWipe = songs.length === 0 && serverSnapshot.size > 0;
+  const bulkTrash = toTrash.length >= 3 && toTrash.length > serverSnapshot.size / 2;
+  if (emptyClientWipe || bulkTrash) {
+    throw new StaleSnapshotError();
+  }
+
   // Any post in the snapshot no longer present in the library was deleted → trash.
-  for (const wpId of Array.from(serverSnapshot.keys())) {
-    if (seenWpIds.has(wpId)) continue;
+  for (const wpId of toTrash) {
     const res = await wpFetch("/songs/" + wpId, "DELETE", undefined, keepalive);
     if (res.status === 401 || res.status === 403) throw new AuthError();
     // A 404 (already gone) is fine; only hard-fail on other errors.
@@ -249,6 +268,9 @@ async function doSave(library, opts) {
   } catch (e) {
     if (e instanceof AuthError) {
       return { ok: false, authExpired: true };
+    }
+    if (e instanceof StaleSnapshotError) {
+      return { ok: false, stale: true };
     }
     // Network error or server hiccup — changes are safe in the buffer.
     return { ok: false, offline: true };
