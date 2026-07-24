@@ -108,10 +108,15 @@ export const css = `
   font-family: inherit; font-size: 13px; font-weight: 500;
   padding: 7px 10px; color: var(--ink-dim);
   text-decoration: none; white-space: nowrap;
+  background: transparent; border: none;
 }
 .sa-savestate.pending { color: var(--ink); }
 .sa-savestate.offline { color: #b0692c; }
 .sa-savestate.expired { color: var(--accent); }
+/* Clickable states (Unsaved → save now, Offline → retry) read as actions. */
+.sa-savestate.clickable { cursor: pointer; }
+.sa-savestate.clickable.pending { color: var(--accent); }
+.sa-savestate.clickable:hover { text-decoration: underline; }
 a.sa-savestate.expired:hover { text-decoration: underline; }
 
 .sa-switcher {

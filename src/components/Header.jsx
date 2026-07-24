@@ -20,11 +20,13 @@ function MetaField({ label, children }) {
 }
 
 // The autosave status indicator that replaces the Save button in WP mode.
-function StatusPill({ state, loginUrl }) {
+// "Unsaved" and "Offline" are clickable to save immediately (skip the debounce
+// / retry); the rest are passive, and "Session expired" is a login link.
+function StatusPill({ state, loginUrl, onSave }) {
   const map = {
     saving: { icon: <Loader2 size={15} className="sa-spin" />, label: "Saving…" },
     saved: { icon: <Check size={15} />, label: "Saved" },
-    pending: { icon: <Save size={15} />, label: "Unsaved" },
+    pending: { icon: <Save size={15} />, label: "Save now" },
     offline: { icon: <WifiOff size={15} />, label: "Offline — changes kept locally" },
     expired: { icon: <TriangleAlert size={15} />, label: "Session expired" },
     viewonly: { icon: <Eye size={15} />, label: "View only" },
@@ -38,6 +40,19 @@ function StatusPill({ state, loginUrl }) {
       </a>
     );
   }
+
+  if ((state === "pending" || state === "offline") && onSave) {
+    return (
+      <button
+        className={`sa-savestate ${state} clickable`}
+        onClick={onSave}
+        title={state === "offline" ? "Retry — save now" : "Save now"}
+      >
+        {s.icon} <span className="sa-btn-text">{s.label}</span>
+      </button>
+    );
+  }
+
   return (
     <div className={`sa-savestate ${state}`} title={s.label}>
       {s.icon} <span className="sa-btn-text">{s.label}</span>
@@ -224,7 +239,7 @@ export function Header({
             </>
           )}
           {wpMode ? (
-            <StatusPill state={saveState} loginUrl={loginUrl} />
+            <StatusPill state={saveState} loginUrl={loginUrl} onSave={onSave} />
           ) : (
             <button
               className={`sa-btn primary ${dirty && !saving ? "" : "muted"}`}
