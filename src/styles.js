@@ -28,12 +28,19 @@ export const styles = {
     justifyContent: "space-between",
     gap: 12,
     padding: "12px 18px 0",
-    flexWrap: "wrap",
+    // nowrap is what keeps this a single row: with wrapping allowed the
+    // browser drops the actions to a second line instead of squeezing the
+    // song title, which is the whole problem we're solving.
+    flexWrap: "nowrap",
   },
-  brandWrap: { display: "flex", alignItems: "center", gap: 12 },
+  // minWidth:0 lets this shrink below its content width (flex items default to
+  // min-width:auto), so a long song name squeezes the title instead of pushing
+  // the actions onto a second row.
+  brandWrap: { display: "flex", alignItems: "center", gap: 12, minWidth: 0, flex: "1 1 auto" },
   // visual styling moved to .sa-brand in css so we can do the hover flip
   brandMark: {},
-  chromeActions: { display: "flex", gap: 8, flexWrap: "wrap" },
+  // The actions keep their natural width; the song title absorbs the squeeze.
+  chromeActions: { display: "flex", gap: 8, flexWrap: "wrap", flexShrink: 0 },
   metaField: { display: "flex", flexDirection: "column", gap: 4 },
   metaLabel: {
     fontSize: 10, letterSpacing: ".14em", textTransform: "uppercase",
@@ -94,14 +101,39 @@ export const css = `
 .sa-btn.primary:hover { filter: brightness(1.05); }
 .sa-btn.primary.muted { background: var(--card); border-color: var(--line); color: var(--ink-dim); }
 
+/* Autosave status indicator (WP mode) — replaces the Save button. Passive by
+   default; the "session expired" variant is a link back to wp-login. */
+.sa-savestate {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: inherit; font-size: 13px; font-weight: 500;
+  padding: 7px 10px; color: var(--ink-dim);
+  text-decoration: none; white-space: nowrap;
+}
+.sa-savestate.pending { color: var(--ink); }
+.sa-savestate.offline { color: #b0692c; }
+.sa-savestate.expired { color: var(--accent); }
+a.sa-savestate.expired:hover { text-decoration: underline; }
+
 .sa-switcher {
   display: flex; align-items: center; gap: 8px;
   font-family: 'Outfit', sans-serif; font-weight: 600; font-size: 20px;
   background: transparent; border: none; color: var(--ink);
   cursor: pointer; padding: 4px 6px; border-radius: 8px;
+  /* A <button> sizes to fit-content, so it would happily overflow its wrapper;
+     cap it so the title inside is the thing that shrinks. */
+  min-width: 0; max-width: 100%;
 }
 .sa-switcher:hover { background: rgba(0,0,0,.04); }
-.sa-switcher .title { letter-spacing: -.01em; }
+/* Cap the visible song name so a long title can't push the header actions
+   (the autosave status) onto a second row. Truncates with an ellipsis; the
+   full name is always available in the dropdown. */
+.sa-switcher .title {
+  letter-spacing: -.01em;
+  max-width: 340px;      /* stylistic cap on wide screens */
+  min-width: 0;          /* ...but always allowed to shrink to fit one row */
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.sa-switcher svg { flex-shrink: 0; }
 
 .sa-menu {
   position: absolute; top: 110%; left: 0; min-width: 230px;
@@ -165,6 +197,24 @@ select.sa-input { padding-right: 28px; appearance: none; -webkit-appearance: non
 .sa-metarow {
   display: flex; align-items: flex-end; justify-content: center;
   gap: 18px; padding: 12px 18px 14px; flex-wrap: wrap;
+}
+
+/* Collapsed song-meta summary (mobile only). A one-line, tappable disclosure
+   that expands into the full .sa-metarow fields. */
+.sa-meta-summary {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  font-family: 'Spline Sans Mono', monospace; font-size: 13px;
+  color: var(--ink-dim);
+  background: transparent; border: none; cursor: pointer;
+  padding: 6px 18px 10px; text-align: left;
+}
+.sa-meta-summary:hover { color: var(--ink); }
+.sa-meta-summary svg { flex-shrink: 0; opacity: .6; }
+.sa-meta-summary-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sa-meta-summary.open {
+  color: var(--ink-dim); font-family: inherit; font-weight: 600;
+  font-size: 10px; letter-spacing: .14em; text-transform: uppercase;
+  padding-bottom: 2px;
 }
 .sa-transport {
   display: flex; align-items: center; gap: 16px;

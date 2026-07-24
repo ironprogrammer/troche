@@ -1,9 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Music, Plus, RotateCcw } from "lucide-react";
-import { PALETTE, STORAGE_KEY } from "./constants.js";
-import { uid } from "./utils.js";
+import { PALETTE } from "./constants.js";
+import { uid, normalizeLibrary } from "./utils.js";
 import { defaultLibrary, defaultSong } from "./defaults.js";
-import { loadLibrary, saveLibrary } from "./storage.js";
+import {
+  loadLibrary,
+  saveLibrary,
+  clearBuffer,
+  wpMode,
+  canEdit,
+  loginUrl,
+} from "./storage.js";
 import { buildShareUrl, consumeSharedFromUrl } from "./share.js";
 import { usePlaybackEngine } from "./hooks/usePlaybackEngine.js";
 import { Header } from "./components/Header.jsx";
@@ -11,12 +18,39 @@ import { Transport } from "./components/Transport.jsx";
 import { PartBlock } from "./components/PartBlock.jsx";
 import { styles, css } from "./styles.js";
 
+// Matches the CSS mobile breakpoint (see styles.js). Used to drop the
+// Share/Export/Import row in WP mode on phones, where autosave makes it
+// redundant and the row costs scarce vertical space.
+function useIsMobile() {
+  const [m, setM] = useState(
+    () => typeof window !== "undefined" && window.matchMedia("(max-width: 560px)").matches
+  );
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 560px)");
+    const on = () => setM(mq.matches);
+    mq.addEventListener("change", on);
+    return () => mq.removeEventListener("change", on);
+  }, []);
+  return m;
+}
+
 export default function App() {
   const [library, setLibrary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [dirty, setDirty] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
   const [saving, setSaving] = useState(false);
+  // WP-mode save status beyond dirty/saving: "offline" | "expired" | null.
+  const [wpStatus, setWpStatus] = useState(null);
+
+  const isMobile = useIsMobile();
+
+  // Latest library/dirty for the pagehide/visibilitychange flush, which reads
+  // through refs to avoid stale closures.
+  const libraryRef = useRef(library);
+  libraryRef.current = library;
+  const dirtyRef = useRef(dirty);
+  dirtyRef.current = dirty;
 
   const partRefs = useRef({});
   const fileInputRef = useRef(null);
@@ -58,7 +92,7 @@ export default function App() {
           id: uid(),
           parts: (s.parts || []).map((p) => ({ ...p, id: uid() })),
         }));
-        if (stored) {
+        if (stored && stored.songs.length) {
           next = {
             songs: [...stored.songs, ...normalized],
             activeId: normalized[0].id,
@@ -66,12 +100,30 @@ export default function App() {
           importedDirty = true; // user has existing data — flag for save
         } else {
           // First-time visitor coming in via a share link: skip the demo,
-          // give them just the shared songs.
+          // give them just the shared songs. (In WP mode the flag below pushes
+          // them to the server on the next autosave.)
           next = { songs: normalized, activeId: normalized[0].id };
+          if (wpMode) importedDirty = true;
         }
+      } else if (stored && stored.songs.length) {
+        next = stored;
+      } else if (wpMode) {
+        // Logged into an empty library (fresh install, nothing imported yet):
+        // seed a single blank song locally so the app renders. It isn't marked
+        // dirty, so it never auto-saves the demo to everyone's server — the
+        // first real edit creates it.
+        const blank = defaultSong("New Song");
+        next = { songs: [blank], activeId: blank.id };
       } else {
-        next = stored || defaultLibrary();
+        next = defaultLibrary();
       }
+
+      // Repair any duplicate/missing ids and exact-duplicate names before the
+      // library is used. If it changed anything, flag a save so the fix sticks
+      // (in WP mode the diff matches by wpId, so renaming is safe).
+      const norm = normalizeLibrary(next);
+      next = norm.library;
+      if (norm.changed) importedDirty = true;
 
       setLibrary(next);
       if (importedDirty) setDirty(true);
@@ -193,7 +245,10 @@ export default function App() {
   const newSong = () => {
     stop();
     const s = defaultSong("New Song");
-    setLibrary((lib) => ({ songs: [...lib.songs, s], activeId: s.id }));
+    // normalize so a second "New Song" becomes "New Song (2)", etc.
+    setLibrary(
+      (lib) => normalizeLibrary({ songs: [...lib.songs, s], activeId: s.id }).library
+    );
     setDirty(true);
   };
 
@@ -238,39 +293,82 @@ export default function App() {
     if (songUndoTimer.current) clearTimeout(songUndoTimer.current);
   };
 
-  const handleSave = async () => {
+  // Fill in server-assigned post handles (wpId) after a WP save, matching by
+  // client id and never overwriting current content — so a save in flight
+  // can't clobber an edit the user just made.
+  const adoptWpIds = useCallback((assignedIds) => {
+    if (!assignedIds || !Object.keys(assignedIds).length) return;
+    setLibrary((cur) => ({
+      ...cur,
+      songs: cur.songs.map((s) =>
+        assignedIds[s.id] && !s.wpId ? { ...s, wpId: assignedIds[s.id] } : s
+      ),
+    }));
+  }, []);
+
+  // The single save path used by autosave, the manual Save button (local mode),
+  // and manual retries. Reads the latest library through the ref.
+  const runSave = useCallback(
+    async (opts = {}) => {
+      const lib = libraryRef.current;
+      if (!lib) return;
+      setSaving(true);
+      const res = await saveLibrary(lib, opts);
+      setSaving(false);
+
+      if (res.ok) {
+        // Only clear dirty if nothing changed under us while the save ran, so
+        // edits made mid-save aren't dropped.
+        if (libraryRef.current === lib) setDirty(false);
+        setWpStatus(null);
+        if (!res.readOnly) {
+          setSavedFlash(true);
+          setTimeout(() => setSavedFlash(false), 1400);
+        }
+        adoptWpIds(res.assignedIds);
+      } else if (res.authExpired) {
+        setWpStatus("expired");
+      } else if (res.offline) {
+        setWpStatus("offline");
+      }
+    },
+    [adoptWpIds]
+  );
+
+  const handleSave = () => {
     if (saving || !dirty) return;
-    setSaving(true);
-    const ok = await saveLibrary(library);
-    setSaving(false);
-    if (ok) {
-      setDirty(false);
-      setSavedFlash(true);
-      setTimeout(() => setSavedFlash(false), 1400);
-    }
+    runSave();
   };
 
-  // Auto-save. Storage is local + synchronous (localStorage), so there's no
-  // reason to make the user press Save — we debounce writes until edits
-  // settle, then flush and clear the dirty flag. The Save button in the
-  // header stays as a passive "Saved" status indicator.
+  // Auto-save on a debounce. Local storage is instant, so a short debounce is
+  // fine; WP saves hit the network, so back off to ~10s and let idle tabs sit.
   useEffect(() => {
     if (!dirty || !library) return;
-    const t = setTimeout(async () => {
-      setSaving(true);
-      const ok = await saveLibrary(library);
-      setSaving(false);
-      if (ok) {
-        setDirty(false);
-        setSavedFlash(true);
-        setTimeout(() => setSavedFlash(false), 1400);
-      }
-    }, 800);
+    const delay = wpMode ? 10000 : 800;
+    const t = setTimeout(() => runSave(), delay);
     return () => clearTimeout(t);
-  }, [dirty, library]);
+  }, [dirty, library, runSave]);
+
+  // Best-effort flush when the tab is hidden or unloaded, so edits inside the
+  // debounce window aren't lost. WP saves use keepalive so they survive unload.
+  useEffect(() => {
+    const flush = () => {
+      if (!dirtyRef.current || !libraryRef.current) return;
+      saveLibrary(libraryRef.current, { keepalive: true });
+    };
+    const onVis = () => {
+      if (document.visibilityState === "hidden") flush();
+    };
+    document.addEventListener("visibilitychange", onVis);
+    window.addEventListener("pagehide", flush);
+    return () => {
+      document.removeEventListener("visibilitychange", onVis);
+      window.removeEventListener("pagehide", flush);
+    };
+  }, []);
 
   // Belt-and-suspenders for the rare case the tab is closed inside the debounce
-  // window before the auto-save has flushed.
+  // window before the flush completes.
   useEffect(() => {
     if (!dirty) return;
     const warn = (e) => {
@@ -310,7 +408,7 @@ export default function App() {
 
   const handleReset = () => {
     if (!window.confirm("Clear all saved songs from this browser? This cannot be undone.")) return;
-    try { window.localStorage.removeItem(STORAGE_KEY); } catch {}
+    clearBuffer();
     stop();
     const lib = defaultLibrary();
     setLibrary(lib);
@@ -366,10 +464,13 @@ export default function App() {
           id: uid(),
           parts: (s.parts || []).map((p) => ({ ...p, id: uid() })),
         }));
-        setLibrary((lib) => ({
-          songs: [...lib.songs, ...normalized],
-          activeId: normalized[0].id,
-        }));
+        setLibrary(
+          (lib) =>
+            normalizeLibrary({
+              songs: [...lib.songs, ...normalized],
+              activeId: normalized[0].id,
+            }).library
+        );
         setDirty(true);
       } catch {
         alert("Could not parse that file — expected a troche export (*.troche.json).");
@@ -428,6 +529,22 @@ export default function App() {
     );
   }
 
+  // WP-mode save indicator state (the autosave status pill replaces the Save
+  // button). Local mode keeps its own Save button and passes null.
+  const saveState = wpMode
+    ? !canEdit
+      ? "viewonly"
+      : saving
+      ? "saving"
+      : wpStatus === "expired"
+      ? "expired"
+      : wpStatus === "offline"
+      ? "offline"
+      : dirty
+      ? "pending"
+      : "saved"
+    : null;
+
   const totalMeasures = activeSong.parts.reduce((s, p) => s + p.measures, 0);
   const totalSeconds = totalBeats * secPerBeat;
   const mm = Math.floor(totalSeconds / 60);
@@ -460,6 +577,10 @@ export default function App() {
           shareFlash={shareFlash}
           setField={setField}
           updateSong={updateSong}
+          wpMode={wpMode}
+          isMobile={isMobile}
+          saveState={saveState}
+          loginUrl={loginUrl}
         />
 
         <Transport

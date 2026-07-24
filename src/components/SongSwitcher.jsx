@@ -12,8 +12,10 @@ export function SongSwitcher({ library, onSwitch, onNew, onDelete, onExportLibra
     return () => document.removeEventListener("mousedown", close);
   }, []);
 
+  // minWidth:0 on the wrapper so this flex item can shrink below its content,
+  // letting the song title truncate instead of forcing the header to two rows.
   return (
-    <div style={{ position: "relative" }} ref={ref}>
+    <div style={{ position: "relative", minWidth: 0 }} ref={ref}>
       <button className="sa-switcher" onClick={() => setOpen((o) => !o)}>
         <span className="title">{active?.name}</span>
         <ChevronDown size={16} style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform .2s" }} />
