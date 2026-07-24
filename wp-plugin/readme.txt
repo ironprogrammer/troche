@@ -4,7 +4,7 @@ Tags: music, band, arrangement, songwriting
 Requires at least: 6.9
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 1.0.0
+Stable tag: 1.0.1
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -66,6 +66,9 @@ Deleted songs go to the trash, and every save is kept as a revision, so you can
 restore either from the dashboard.
 
 == Changelog ==
+
+= 1.0.1 =
+* Add a print view: use your browser's Print (Ctrl/Cmd+P) for a clean one-page chart of the song's arrangement.
 
 = 1.0.0 =
 * Initial release.

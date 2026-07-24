@@ -3,7 +3,7 @@
  * Plugin Name:       Troche
  * Plugin URI:        https://github.com/ironprogrammer/troche
  * Description:        Server-side storage and login gating for the Troche song-form arranger. Bandmates save and load song forms through the site instead of passing JSON files around; songs stay off the public web.
- * Version:           1.0.0
+ * Version:           1.0.1
  * Requires at least: 6.9
  * Requires PHP:      7.4
  * Author:            Brian Alexander
@@ -20,7 +20,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'TROCHE_VERSION', '1.0.0' );
+define( 'TROCHE_VERSION', '1.0.1' );
 define( 'TROCHE_FILE', __FILE__ );
 define( 'TROCHE_DIR', plugin_dir_path( __FILE__ ) );
 define( 'TROCHE_URL', plugin_dir_url( __FILE__ ) );
