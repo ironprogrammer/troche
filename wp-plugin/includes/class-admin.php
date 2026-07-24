@@ -25,9 +25,35 @@ class Admin {
 	public function register() {
 		add_action( 'admin_menu', array( $this, 'add_menu' ) );
 		add_action( 'admin_init', array( $this, 'maybe_save' ) );
+		add_action( 'admin_notices', array( $this, 'maybe_permalink_notice' ) );
 		add_filter(
 			'plugin_action_links_' . plugin_basename( TROCHE_FILE ),
 			array( $this, 'action_links' )
+		);
+	}
+
+	/**
+	 * Warn administrators when the site uses plain permalinks — the app route
+	 * ( /{slug}/ ) can't resolve without a permalink structure. The notice
+	 * clears itself once permalinks are set.
+	 */
+	public function maybe_permalink_notice() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+		if ( '' !== get_option( 'permalink_structure' ) ) {
+			return;
+		}
+
+		$message = sprintf(
+			/* translators: %s: URL of the Permalinks settings screen. */
+			__( 'Troche needs pretty permalinks to serve the app. Set <a href="%s">Settings &rarr; Permalinks</a> to any option other than Plain.', 'troche' ),
+			esc_url( admin_url( 'options-permalink.php' ) )
+		);
+
+		printf(
+			'<div class="notice notice-warning"><p>%s</p></div>',
+			wp_kses( $message, array( 'a' => array( 'href' => array() ) ) )
 		);
 	}
 

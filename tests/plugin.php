@@ -107,5 +107,21 @@ $noid   = troche_rest( 'GET', '/troche/v1/library' )->get_data()['songs'];
 $last   = end( $noid );
 check( 'server assigns an id when one is missing', ! empty( $last['id'] ) && is_string( $last['id'] ) );
 
+// ---- plain-permalinks admin notice ----
+wp_set_current_user( $admin_id );
+$admin_ui = new \Troche\Admin();
+
+update_option( 'permalink_structure', '' ); // Plain
+ob_start();
+$admin_ui->maybe_permalink_notice();
+$notice_plain = ob_get_clean();
+check( 'permalink notice shown on Plain permalinks', false !== strpos( $notice_plain, 'permalink' ) );
+
+update_option( 'permalink_structure', '/%postname%/' ); // Pretty
+ob_start();
+$admin_ui->maybe_permalink_notice();
+$notice_pretty = ob_get_clean();
+check( 'permalink notice hidden once permalinks are set', '' === trim( $notice_pretty ) );
+
 file_put_contents( $out, "\n=== $pass passed, $fail failed ===\n", FILE_APPEND );
 echo 'done';
