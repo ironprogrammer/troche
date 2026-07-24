@@ -16,6 +16,7 @@ import { usePlaybackEngine } from "./hooks/usePlaybackEngine.js";
 import { Header } from "./components/Header.jsx";
 import { Transport } from "./components/Transport.jsx";
 import { PartBlock } from "./components/PartBlock.jsx";
+import { PrintChart } from "./components/PrintChart.jsx";
 import { styles, css } from "./styles.js";
 
 // Matches the CSS mobile breakpoint (see styles.js). Used to drop the
@@ -573,6 +574,9 @@ export default function App() {
   return (
     <div style={styles.root}>
       <style>{css}</style>
+
+      {/* Print-only chart — hidden on screen, revealed inside @media print. */}
+      <PrintChart song={activeSong} />
 
       <div ref={stickyRef} style={styles.stickyTop}>
         <Header
