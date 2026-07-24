@@ -7,7 +7,11 @@
     "dev": "vite",
     "build": "vite build",
     "build:wp": "vite build && node scripts/sync-dist.mjs",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "npm run test:unit && npm run test:plugin && npm run test:zip",
+    "test:unit": "node tests/unit.mjs",
+    "test:plugin": "bash tests/plugin.sh",
+    "test:zip": "bash tests/zip-install.sh"
   },
   "dependencies": {
     "lucide-react": "^1.16.0",

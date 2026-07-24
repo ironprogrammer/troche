@@ -35,6 +35,8 @@ the app — your theme is not involved.
 == Installation ==
 
 1. Upload `troche.zip` on **Plugins → Add New → Upload Plugin**, then activate.
+   The app route needs pretty permalinks — set **Settings → Permalinks** to any
+   option other than Plain.
 2. Go to **Settings → Troche**. Set the app URL slug (default `troche`) and
    check the members who should be allowed to edit. Administrators can always
    edit.
