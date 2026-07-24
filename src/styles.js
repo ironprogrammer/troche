@@ -523,18 +523,24 @@ input[type=number]::-webkit-inner-spin-button { opacity: .4; }
 .sa-print { display: none; }
 
 @media print {
-  @page { margin: 14mm; }
+  /* Take the page margin off @page — WebKit/Safari honors it inconsistently and
+     also reserves header/footer space on top of it, which enlarges the top
+     margin and pushes the last row onto a phantom second page. Zero the @page
+     margin (this also drops the browser's date/URL chrome) and recreate the
+     margin as padding on the print container, which every engine agrees on. */
+  @page { margin: 0; }
   /* Neutralize the app shell so nothing but the chart reaches paper: the root's
      inline cream background and min-height:100vh would otherwise print a tinted
-     band and spill onto a second page. */
-  html, body { background: #fff !important; }
+     band and spill onto a second page. body's default margin is zeroed too — a
+     stray few px there is enough to tip a tight one-page layout in Safari. */
+  html, body { background: #fff !important; margin: 0 !important; }
   #root, #root > div {
     background: transparent !important; min-height: 0 !important; padding: 0 !important;
   }
   /* .sa-print is the first rendered child of the root, so its later siblings
      are the entire interactive app — hide them and show only the chart. */
   .sa-print ~ * { display: none !important; }
-  .sa-print { display: block; color: #000; }
+  .sa-print { display: block; color: #000; padding: 14mm; }
 
   .sa-print-head {
     display: flex; align-items: baseline; justify-content: space-between;
@@ -570,8 +576,8 @@ input[type=number]::-webkit-inner-spin-button { opacity: .4; }
     letter-spacing: -.01em; line-height: 1.05; color: #000;
   }
   .sa-print-cue {
-    margin-top: 1px; font-family: 'Spline Sans Mono', monospace; font-size: 13px;
-    color: #555; line-height: 1.3;
+    margin-top: 1px; font-family: 'Spline Sans Mono', monospace; font-size: 11px;
+    color: #555; line-height: 1.25;
   }
   .sa-print-sig { font-weight: 700; color: #000; margin-right: 4px; }
 }
