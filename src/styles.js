@@ -514,4 +514,65 @@ input[type=number]::-webkit-inner-spin-button { opacity: .4; }
   .sa-transport { padding: 8px 18px; gap: 12px; }
   .sa-statuswrap { min-height: 40px; }
 }
+
+/* ---- print chart (browser Print / ⌘P) ----
+   A read-only, one-page chart of the active song. Hidden on screen; revealed
+   only when printing, with the interactive app hidden. Everything is solid
+   black so it holds up on a B&W laser. Rendered by PrintChart.jsx from the same
+   song state + partSig math as the app, so it can't drift out of sync. */
+.sa-print { display: none; }
+
+@media print {
+  @page { margin: 14mm; }
+  /* Neutralize the app shell so nothing but the chart reaches paper: the root's
+     inline cream background and min-height:100vh would otherwise print a tinted
+     band and spill onto a second page. */
+  html, body { background: #fff !important; }
+  #root, #root > div {
+    background: transparent !important; min-height: 0 !important; padding: 0 !important;
+  }
+  /* .sa-print is the first rendered child of the root, so its later siblings
+     are the entire interactive app — hide them and show only the chart. */
+  .sa-print ~ * { display: none !important; }
+  .sa-print { display: block; color: #000; }
+
+  .sa-print-head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    gap: 10px 20px; flex-wrap: wrap;
+    border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 14px;
+  }
+  .sa-print-title {
+    font-family: 'Outfit', sans-serif; font-size: 24px; font-weight: 800;
+    letter-spacing: -.02em; line-height: 1.05;
+  }
+  /* value-first, unit-suffixed — one consistent order throughout */
+  .sa-print-meta {
+    font-family: 'Spline Sans Mono', monospace; font-size: 13px; color: #555;
+    display: flex; flex-wrap: wrap; gap: 4px 12px; font-variant-numeric: tabular-nums;
+  }
+  .sa-print-meta span { white-space: nowrap; }
+  .sa-print-meta b { color: #000; font-weight: 700; }
+
+  /* Top-aligned so each big bar number and its part name start on one line. */
+  .sa-print-row {
+    display: flex; align-items: flex-start; gap: 28px; padding: 9px 4px;
+    break-inside: avoid;
+  }
+  .sa-print-row + .sa-print-row { border-top: 1px solid #ccc; }
+  .sa-print-bars {
+    flex-shrink: 0; width: 46px; text-align: right;
+    font-family: 'Spline Sans Mono', monospace; font-size: 27px; font-weight: 700;
+    line-height: 1; letter-spacing: -.02em; color: #000; font-variant-numeric: tabular-nums;
+  }
+  .sa-print-main { flex: 1; min-width: 0; }
+  .sa-print-name {
+    font-family: 'Outfit', sans-serif; font-size: 15px; font-weight: 700;
+    letter-spacing: -.01em; line-height: 1.05; color: #000;
+  }
+  .sa-print-cue {
+    margin-top: 1px; font-family: 'Spline Sans Mono', monospace; font-size: 13px;
+    color: #555; line-height: 1.3;
+  }
+  .sa-print-sig { font-weight: 700; color: #000; margin-right: 4px; }
+}
 `;
