@@ -1,0 +1,13 @@
+{
+  "name": "troche",
+  "version": "1.0.0",
+  "private": true,
+  "description": "WordPress storage and login gating for the Troche song-form arranger.",
+  "license": "GPL-2.0-or-later",
+  "files": [
+    "troche.php",
+    "includes",
+    "dist",
+    "readme.txt"
+  ]
+}

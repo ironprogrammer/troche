@@ -45,7 +45,7 @@ npm install
 npm run dev
 ```
 
-Open the URL Vite prints (usually `http://localhost:5173/troche/`).
+Open the URL Vite prints (usually `http://localhost:5173/`).
 
 Saving (the Save button) writes to your browser's `localStorage`, so songs
 persist between reloads on that machine.
@@ -63,10 +63,62 @@ GitHub Actions in `.github/workflows/deploy.yml` builds on every push to
 `main` and publishes `dist/` to GitHub Pages. The repo's **Settings → Pages**
 must have **Source = GitHub Actions**.
 
-Vite's `base` in `vite.config.js` is set to `/troche/` to match the repo
-name. If you fork under a different name (or move to a custom domain at the
-root), update `base` accordingly.
+Vite's `base` in `vite.config.js` is `./` (relative), so the same `dist/`
+serves from both the GitHub Pages subpath and the WordPress plugin.
 
+## WordPress plugin
+
+The same app can run from a WordPress site with server-side storage and login
+gating, so bandmates save and load song forms through the site instead of
+passing JSON files around. Songs stay off the public web. The standalone build
+is unaffected: without a WordPress host the app runs `localStorage`-only,
+exactly as above.
+
+The plugin lives in `wp-plugin/`. It serves the built app behind login, saves
+each song as a revisioned custom post, and exposes it under a URL slug you
+choose (default `/troche`). Viewing requires being logged in; editing requires
+a capability you grant per user on **Settings → Troche**.
+
+### Build
+
+```bash
+npm run build:wp
+```
+
+Builds the app and copies `dist/` into `wp-plugin/dist/` — the plugin serves
+its own copy, and the root `dist/` used by GitHub Pages is left untouched.
+
+### Test locally
+
+Uses [WordPress Playground](https://developer.wordpress.org/playground/): real
+WordPress on SQLite, no Docker, auto-admin login.
+
+From the repo root:
+
+```bash
+npm run build:wp
+npx @wp-playground/cli@latest start --port 9400 \
+  --mount wp-plugin:/wordpress/wp-content/plugins/troche \
+  --blueprint wp-plugin/.playground/blueprint.json --login
+```
+
+This mounts and activates the plugin and logs you in as an administrator. Open
+<http://127.0.0.1:9400/troche/>, then configure the URL slug and editors on
+**Settings → Troche**. To check the view-vs-edit gates, add a Subscriber user,
+grant them editing, and sign in as them.
+
+### Release and install
+
+Pushing a version tag builds the app, packages `troche.zip`, and attaches it to
+a GitHub release (`.github/workflows/release.yml`):
+
+```bash
+git tag v1.0.0
+git push --tags
+```
+
+Install or update by uploading `troche.zip` on **Plugins → Add New → Upload
+Plugin** in wp-admin.
 
 ## Notes / known limitations
 

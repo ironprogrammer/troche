@@ -1,0 +1,7 @@
+{
+	"$schema": "https://playground.wordpress.net/blueprint-schema.json",
+	"landingPage": "/troche/",
+	"steps": [
+		{ "step": "activatePlugin", "pluginPath": "troche/troche.php" }
+	]
+}

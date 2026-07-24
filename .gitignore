@@ -1,5 +1,7 @@
 node_modules
 dist
+wp-plugin/dist
+wp-plugin/troche.zip
 .DS_Store
 *.log
 .vite
