@@ -254,22 +254,40 @@ select.sa-input { padding-right: 28px; appearance: none; -webkit-appearance: non
 .sa-metro:hover { border-color: var(--ink-dim); color: var(--ink); }
 .sa-metro.on { color: var(--accent); border-color: var(--accent); background: rgba(216,72,59,.06); }
 
-/* Beat flash overlay. Transparent at rest; the playback engine animates its
-   opacity per beat (Web Animations API, so the fade is composited off the
-   main thread) and swaps .downbeat on for accented beats.
+/* Beat flash overlay. Transparent at rest; the playback engine animates the
+   inner fill's opacity per beat (Web Animations API, so the fade is composited
+   off the main thread) and swaps .downbeat on for accented beats.
    Off-beat: dim, edge-weighted, the sheet stays readable underneath.
    Downbeat: flat fill at near-full opacity — it can hide the sheet because
-   the engine keeps it to ~70ms. */
+   the engine keeps it to ~70ms.
+
+   Two things here are about Safari 26, which tints the status bar and toolbar
+   by sampling fixed/sticky elements near the viewport edges rather than from
+   theme-color. A full-viewport fixed overlay is the candidate at both edges,
+   so an accent background on it turns the browser chrome into orange bars for
+   the whole of playback, and a transparent one turns them white. Hence:
+   .live — the wrapper is display:none between beats, so most of the time it
+   isn't in the render tree to be sampled at all (opacity 0 is not enough,
+   Safari still reads the background off a hidden fixed element); and the
+   color sits on an absolutely positioned child, so even mid-beat the fixed
+   wrapper itself has nothing to sample and the chrome falls back to the paper
+   background set on html/body in index.html. */
 .sa-flash {
+  display: none;
   position: fixed; inset: 0; z-index: 100;
-  pointer-events: none; opacity: 0;
+  pointer-events: none; background: transparent;
+}
+.sa-flash.live { display: block; }
+.sa-flash-fill {
+  position: absolute; inset: 0;
+  opacity: 0;
   background: radial-gradient(
     ellipse at center,
     color-mix(in srgb, var(--accent) 55%, transparent) 0%,
     var(--accent) 100%
   );
 }
-.sa-flash.downbeat { background: var(--accent); }
+.sa-flash-fill.downbeat { background: var(--accent); }
 
 .sa-input.sig { width: 84px; font-family: 'Spline Sans Mono', monospace; }
 .sa-input.editor-sig { width: auto; min-width: 170px; }
@@ -409,6 +427,13 @@ select.sa-input { padding-right: 28px; appearance: none; -webkit-appearance: non
   width: 100%; padding: 2px 0; letter-spacing: -.01em;
 }
 .sa-partname:focus { outline: none; }
+/* Locked during playback, but this is exactly when the chart has to be most
+   readable — so no dimming. WebKit greys disabled input text via text-fill,
+   which opacity/color alone don't override. */
+.sa-partname:disabled, .sa-cue:disabled {
+  opacity: 1; color: var(--ink); -webkit-text-fill-color: var(--ink);
+}
+.sa-cue:disabled:hover { border-bottom-color: transparent; }
 .sa-block-sub {
   display: flex; align-items: center; gap: 10px;
   font-size: 12px; color: var(--ink-dim);
@@ -439,6 +464,9 @@ select.sa-input { padding-right: 28px; appearance: none; -webkit-appearance: non
   cursor: pointer; color: var(--ink-dim); transition: all .15s;
 }
 .sa-config:hover { border-color: var(--ink-dim); color: var(--ink); }
+/* The swatch keeps its color so the part is still identifiable while locked. */
+.sa-config:disabled { opacity: .5; cursor: default; }
+.sa-config:disabled:hover { border-color: var(--line); color: var(--ink-dim); }
 .sa-config.open { border-color: var(--clr); color: var(--ink); background: var(--bg); }
 .sa-swatch { width: 16px; height: 16px; border-radius: 5px; display: block; box-shadow: inset 0 0 0 1px rgba(0,0,0,.08); }
 
@@ -597,5 +625,22 @@ input[type=number]::-webkit-inner-spin-button { opacity: .4; }
     color: #555; line-height: 1.25;
   }
   .sa-print-sig { font-weight: 700; color: #000; margin-right: 4px; }
+}
+
+/* iOS Safari zooms the page in whenever a focused text field is smaller than
+   16px, and it does not zoom back out when the field blurs — you're left
+   panning around a magnified chart mid-song. 16px is a hard threshold, not a
+   design choice, so every text field gets it on touch; the desktop sizes are
+   untouched. Selects are exempt (they open a picker, not a keyboard) and
+   .sa-partname is already 16px+ at every width.
+
+   This block sits last on purpose. Each selector is element-qualified so it
+   outranks the class rules that set the smaller sizes — a plain .sa-cue would
+   only tie with the 12px rule further up, and .sa-input.sample's two classes
+   outrank a bare input.sa-input wherever it sits. */
+@media (pointer: coarse) {
+  input.sa-input,
+  input.sa-input.sample,
+  input.sa-cue { font-size: 16px; }
 }
 `;

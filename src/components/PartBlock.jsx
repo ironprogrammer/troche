@@ -23,6 +23,13 @@ export const PartBlock = React.forwardRef(function PartBlock(
     else if (ref) ref.current = el;
   };
 
+  // Playback collapses the editors: the settings in there can't be changed
+  // mid-song anyway, and the expanded panel just pushes the parts you're
+  // actually reading off the screen.
+  useEffect(() => {
+    if (playing) setEditing(false);
+  }, [playing]);
+
   useEffect(() => {
     if (autoFocusName && nameRef.current) {
       nameRef.current.focus();
@@ -114,6 +121,7 @@ export const PartBlock = React.forwardRef(function PartBlock(
             ref={nameRef}
             className="sa-partname"
             value={part.name}
+            disabled={playing}
             onChange={(e) => onUpdate({ name: e.target.value })}
             onFocus={(e) => {
               // Defer past the mousedown→mouseup that would otherwise place a
@@ -132,6 +140,7 @@ export const PartBlock = React.forwardRef(function PartBlock(
               className="sa-cue"
               placeholder="cue / note…"
               value={part.cue || ""}
+              disabled={playing}
               onChange={(e) => onUpdate({ cue: e.target.value })}
             />
             {part.sample && (
@@ -146,7 +155,8 @@ export const PartBlock = React.forwardRef(function PartBlock(
           <button
             className={`sa-config ${editing ? "open" : ""}`}
             onClick={() => setEditing((v) => !v)}
-            title="Part settings"
+            disabled={playing}
+            title={playing ? "Stop playback to edit part settings" : "Part settings"}
           >
             <span className="sa-swatch" style={{ background: part.color }} />
             <Settings2 size={15} />
@@ -208,6 +218,7 @@ export const PartBlock = React.forwardRef(function PartBlock(
               className="sa-input sample"
               placeholder="https://… link to mp3 / wav"
               value={part.sample}
+              disabled={playing}
               onChange={(e) => onUpdate({ sample: e.target.value })}
             />
           </div>

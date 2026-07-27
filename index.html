@@ -6,6 +6,15 @@
     <meta name="theme-color" content="#faf8f4" />
     <link rel="icon" type="image/svg+xml" href="/troche-icon.svg" />
     <title>troche</title>
+    <style>
+      /* Safari 26 ignores theme-color and instead tints the status bar and
+         toolbar from the page's own edge colors, falling back to the root
+         background when nothing else qualifies. Left at the UA default that
+         fallback is white, which shows up as hard white bars above and below
+         the app; the 8px UA body margin put a white gutter at those same edges.
+         Paper-colored and flush, so the chrome blends into the app. */
+      html, body { margin: 0; background: #faf8f4; }
+    </style>
   </head>
   <body>
     <div id="root"></div>
