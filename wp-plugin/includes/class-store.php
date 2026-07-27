@@ -100,13 +100,13 @@ class Store {
 	}
 
 	/**
-	 * The whole library in the envelope format, each song decorated with its
-	 * post id (`wpId`) as the save handle. Trashed songs are excluded.
+	 * Every live song post, oldest first. Shared by get_library() and
+	 * get_state() so the two can never disagree about what's in the library.
 	 *
-	 * @return array { format:string, version:int, songs:array[] }
+	 * @return \WP_Post[]
 	 */
-	public static function get_library() {
-		$posts = get_posts(
+	private static function get_song_posts() {
+		return get_posts(
 			array(
 				'post_type'        => self::POST_TYPE,
 				'post_status'      => 'publish',
@@ -116,15 +116,25 @@ class Store {
 				'suppress_filters' => false,
 			)
 		);
+	}
 
+	/**
+	 * The whole library in the envelope format, each song decorated with its
+	 * post id (`wpId`) as the save handle and its version token (`wpToken`).
+	 * Trashed songs are excluded.
+	 *
+	 * @return array { format:string, version:int, songs:array[] }
+	 */
+	public static function get_library() {
 		$songs = array();
-		foreach ( $posts as $post ) {
+		foreach ( self::get_song_posts() as $post ) {
 			$song = self::decode_song( $post->post_content );
 			if ( null === $song ) {
 				continue;
 			}
-			$song['wpId'] = (int) $post->ID;
-			$songs[]      = $song;
+			$song['wpId']    = (int) $post->ID;
+			$song['wpToken'] = self::token( $post->post_content );
+			$songs[]         = $song;
 		}
 
 		return array(
@@ -132,6 +142,44 @@ class Store {
 			'version' => self::VERSION,
 			'songs'   => $songs,
 		);
+	}
+
+	/**
+	 * Version tokens for every live song, keyed by post id — the cheap "has
+	 * anything moved?" probe a second tab polls before it saves. Carries no
+	 * song content, so it stays small however big the library gets.
+	 *
+	 * @return array { tokens: array<string,string> }
+	 */
+	public static function get_state() {
+		$tokens = array();
+		foreach ( self::get_song_posts() as $post ) {
+			if ( null === self::decode_song( $post->post_content ) ) {
+				// Skip unparseable posts, exactly as get_library() does, so the
+				// two views agree on which songs exist.
+				continue;
+			}
+			$tokens[ (string) $post->ID ] = self::token( $post->post_content );
+		}
+
+		return array( 'tokens' => (object) $tokens );
+	}
+
+	/**
+	 * A song's version token: a hash of its stored JSON.
+	 *
+	 * Content-derived rather than time-derived on purpose. post_modified_gmt
+	 * only has one-second resolution (two saves in the same second look
+	 * identical) and it moves even when a save rewrites byte-identical content,
+	 * which would show up in another tab as a phantom conflict. Clients only
+	 * ever compare tokens for equality — they never compute one — so the hash
+	 * is free to change shape later.
+	 *
+	 * @param string $content post_content.
+	 * @return string
+	 */
+	private static function token( $content ) {
+		return md5( (string) $content );
 	}
 
 	/**
@@ -155,8 +203,8 @@ class Store {
 			$song['id'] = self::generate_id();
 		}
 
-		// The wpId is a server-side handle, not part of the stored envelope.
-		unset( $song['wpId'] );
+		// wpId and wpToken are server-side handles, not part of the stored envelope.
+		unset( $song['wpId'], $song['wpToken'] );
 
 		// wp_insert_post()/wp_update_post() expect slashed input and strip one
 		// level of slashes on the way in; the encoded JSON contains backslashes
@@ -188,7 +236,15 @@ class Store {
 			return $result;
 		}
 
-		$song['wpId'] = (int) $result;
+		// Token comes from the post as actually stored, not from the string we
+		// sent: wp_insert_post()/wp_update_post() run content through save
+		// filters (kses for users without unfiltered_html, among others), and a
+		// token that didn't survive those filters would read as a conflict on
+		// the very next poll.
+		$stored = get_post( (int) $result );
+
+		$song['wpId']    = (int) $result;
+		$song['wpToken'] = self::token( $stored ? $stored->post_content : '' );
 		return $song;
 	}
 

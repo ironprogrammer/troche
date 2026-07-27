@@ -27,6 +27,9 @@ This plugin serves the app from your WordPress site and adds:
   the editing capability can change it.
 * **Autosave and save history.** Edits save automatically, and every save is a
   WordPress revision you can review and restore from the dashboard.
+* **Safe on two devices at once.** If a bandmate changes a song while you have
+  it open, the app notices and quietly brings the change in. It only asks you
+  to choose when the same song was edited in both places.
 * **Import and export.** Move a library in or out as JSON at any time.
 
 The app is served at a URL you choose (default `/troche`), styled entirely by

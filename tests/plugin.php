@@ -86,6 +86,42 @@ check( 'library now has 1 song', 1 === count( $data['songs'] ) );
 check( 'song carries wpId', ( $data['songs'][0]['wpId'] ?? 0 ) === $wp_id );
 check( 'unicode key round-trips', 'A♭' === ( $data['songs'][0]['musicalKey'] ?? '' ) );
 
+// ---- version tokens (upstream-change detection) ----
+$token = $data['songs'][0]['wpToken'] ?? '';
+check( 'song carries wpToken', is_string( $token ) && '' !== $token );
+check( 'create response carries wpToken', ! empty( $r->get_data()['wpToken'] ) );
+check( 'create token matches the library token', ( $r->get_data()['wpToken'] ?? null ) === $token );
+
+wp_set_current_user( 0 );
+check( 'GET /library/state logged-out -> 401', 401 === troche_rest( 'GET', '/troche/v1/library/state' )->get_status() );
+wp_set_current_user( $sub_id );
+$state = troche_rest( 'GET', '/troche/v1/library/state' );
+check( 'GET /library/state -> 200', 200 === $state->get_status() );
+$tokens = (array) ( $state->get_data()['tokens'] ?? array() );
+check( 'state lists one token, keyed by wpId', array( (string) $wp_id => $token ) === $tokens );
+
+// A save that rewrites identical content must not move the token — otherwise
+// every idle tab would see a phantom conflict.
+troche_rest( 'PUT', '/troche/v1/songs/' . $wp_id, $song );
+$same = (array) troche_rest( 'GET', '/troche/v1/library/state' )->get_data()['tokens'];
+check( 'token stable across an identical re-save', $token === ( $same[ (string) $wp_id ] ?? '' ) );
+
+// A real edit must move it.
+$edited        = $song;
+$edited['bpm'] = 140;
+troche_rest( 'PUT', '/troche/v1/songs/' . $wp_id, $edited );
+$moved = (array) troche_rest( 'GET', '/troche/v1/library/state' )->get_data()['tokens'];
+check( 'token changes when content changes', $token !== ( $moved[ (string) $wp_id ] ?? '' ) );
+check(
+	'update response token matches the new state token',
+	( troche_rest( 'PUT', '/troche/v1/songs/' . $wp_id, $edited )->get_data()['wpToken'] ?? null )
+		=== ( $moved[ (string) $wp_id ] ?? '' )
+);
+
+// wpToken is a transport handle, like wpId — it must never be stored.
+$stored_song = json_decode( get_post_field( 'post_content', $wp_id ), true );
+check( 'stored content omits wpToken', ! isset( $stored_song['wpToken'] ) );
+
 // ---- wp-admin cap mapping (post-type actions gate on troche_edit, not core post caps) ----
 $editor_id = wp_insert_user(
 	array(

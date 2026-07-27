@@ -9,6 +9,7 @@ Requires **Node 20+** (same as the build). Run from the repo root.
 | Command | What it covers |
 | --- | --- |
 | `npm run test:unit` | `normalizeLibrary` — duplicate/missing id repair and macOS-style name de-duping. Pure Node, no WordPress. |
+| `npm run test:sync` | The WP reconcile path in `storage.js` — what a second open tab adopts silently vs. flags, and that flagged songs are held back from saving. Runs against a fake in-process WordPress. |
 | `npm run test:plugin` | The plugin source in a fresh WordPress: post type, REST CRUD, the login-to-read and cap-to-edit gates, revisions, trash-on-delete. |
 | `npm run test:zip` | Builds `troche.zip` and installs it into a fresh WordPress the same way a wp-admin upload would, then verifies it unpacked, activated, and runs. |
 | `npm test` | All of the above. |

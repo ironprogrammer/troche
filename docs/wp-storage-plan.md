@@ -72,8 +72,15 @@ subpath and the plugin directory.
 - **Autosave replaces the Save button:** ~10s debounce, fires only when dirty,
   flush on `visibilitychange`/`pagehide`. Status indicator: "Saved ✓ /
   Saving… / Offline — changes kept locally."
-- **Conflicts: last write wins**; revisions are the safety net. Dirty-only
-  saving means idle open tabs never clobber.
+- **Conflicts: reconcile per song, prompt only when it's genuinely ambiguous.**
+  Dirty-only saving already means idle open tabs never clobber. On top of that,
+  the app checks `GET /library/state` (version tokens, no content) when a tab
+  becomes visible and again before each save. A song changed on another machine
+  that this tab hasn't touched is adopted silently; one added there is pulled
+  in; one trashed there is dropped. Only a song edited in *both* places, or
+  edited here and trashed there, surfaces to the user — those are held back
+  from saving until resolved, while the rest of the library keeps autosaving.
+  Whichever copy loses is still recoverable from the song's revisions.
 - **Share/Export/Import stay functionally untouched** in both modes (one
   codebase; they're client-side and cost nothing). Export/Import double as the
   seeding path: each bandmate exports their existing localStorage library and

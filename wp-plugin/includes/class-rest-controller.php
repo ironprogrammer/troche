@@ -3,6 +3,7 @@
  * REST endpoints under troche/v1.
  *
  * - GET    /library        Whole library in the envelope format (login required).
+ * - GET    /library/state  Per-song version tokens, no content (login required).
  * - POST   /songs          Create a song              (troche_edit required).
  * - PUT    /songs/{id}      Update a song              (troche_edit required).
  * - DELETE /songs/{id}      Trash a song               (troche_edit required).
@@ -40,6 +41,16 @@ class Rest_Controller {
 			array(
 				'methods'             => \WP_REST_Server::READABLE,
 				'callback'            => array( $this, 'get_library' ),
+				'permission_callback' => array( $this, 'can_read' ),
+			)
+		);
+
+		register_rest_route(
+			self::NAMESPACE,
+			'/library/state',
+			array(
+				'methods'             => \WP_REST_Server::READABLE,
+				'callback'            => array( $this, 'get_state' ),
 				'permission_callback' => array( $this, 'can_read' ),
 			)
 		);
@@ -109,6 +120,19 @@ class Rest_Controller {
 	 */
 	public function get_library() {
 		return rest_ensure_response( Store::get_library() );
+	}
+
+	/**
+	 * Return per-song version tokens so a client can tell, in one small
+	 * request, whether anything changed under it since its last sync.
+	 *
+	 * @return \WP_REST_Response
+	 */
+	public function get_state() {
+		$response = rest_ensure_response( Store::get_state() );
+		// Freshness is the whole point — never let a cache answer this.
+		$response->header( 'Cache-Control', 'no-store, max-age=0' );
+		return $response;
 	}
 
 	/**

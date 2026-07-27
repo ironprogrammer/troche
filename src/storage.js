@@ -76,6 +76,19 @@ function writeBuffer(lib) {
 // songs never issue writes.
 let serverSnapshot = new Map();
 
+// The server's own version token per song (wpId -> token), captured alongside
+// serverSnapshot. The server mints these from the stored JSON; the client only
+// ever compares them for equality, so there's no canonicalization to keep in
+// step across the two languages. Diffing these against /library/state is how we
+// notice another tab has written since we last looked.
+let serverTokens = new Map();
+
+// Songs whose writes are suppressed because reconciling them needs the user:
+// edited here *and* upstream, or edited here and trashed upstream. Held by
+// wpId. Everything else in the library keeps saving normally — a conflict on
+// one song is no reason to stall the rest.
+let heldWpIds = new Set();
+
 // Handles assigned to songs created earlier this session, keyed by song id, so
 // a re-save that fires before the app has adopted the new wpId into state can't
 // create a duplicate. Reset on every load.
@@ -98,9 +111,22 @@ function stableStringify(v) {
   return JSON.stringify(v);
 }
 
+// wpId and wpToken are transport handles, not song data — excluded so neither
+// one can read as an edit.
 function songContent(song) {
-  const { wpId, ...rest } = song;
+  const { wpId, wpToken, ...rest } = song;
   return stableStringify(rest);
+}
+
+function songPayload(song) {
+  const { wpId, wpToken, ...rest } = song;
+  return rest;
+}
+
+// A song's server handle: its adopted wpId, or one assigned to it earlier this
+// session but not yet reflected in app state.
+function handleOf(song) {
+  return song.wpId ?? createdIds.get(song.id) ?? null;
 }
 
 function wpUrl(path) {
@@ -123,6 +149,17 @@ async function wpFetch(path, method, body, keepalive) {
   return res;
 }
 
+// Read a response body without letting a parse failure unwind a write that
+// already landed. A missing token just means the next probe sees a change and
+// re-pulls the song, which is harmless — losing the save is not.
+async function readJson(res) {
+  try {
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
 // Thrown to unwind a save when the session/nonce is no longer valid.
 class AuthError extends Error {}
 
@@ -132,19 +169,60 @@ class AuthError extends Error {}
 // state and a fresh load rebuilds the snapshot.
 class StaleSnapshotError extends Error {}
 
-async function loadFromWp() {
+// Thrown when an update targets a song the server no longer has — trashed on
+// another machine since our last sync. Distinct from a network failure, which
+// is what it used to be reported as: a sync reclassifies the song as an orphan
+// and asks whether to keep or discard it.
+class MissingSongError extends Error {}
+
+async function fetchLibrary() {
   const res = await wpFetch("/library", "GET");
   if (res.status === 401 || res.status === 403) throw new AuthError();
   if (!res.ok) throw new Error("load failed: " + res.status);
   const data = await res.json();
-  const songs = Array.isArray(data?.songs) ? data.songs : [];
+  return Array.isArray(data?.songs) ? data.songs : [];
+}
 
-  // Rebuild the server snapshot (keyed by wpId) from what we just fetched.
+// The cheap probe: version tokens only, no song content.
+async function fetchState() {
+  const res = await wpFetch("/library/state", "GET");
+  if (res.status === 401 || res.status === 403) throw new AuthError();
+  if (!res.ok) throw new Error("state failed: " + res.status);
+  const data = await res.json();
+  const tokens = data?.tokens;
+  return tokens && typeof tokens === "object" ? tokens : {};
+}
+
+// Record "what the server holds" from a freshly fetched library. Builds new
+// Maps rather than mutating, so a caller can hold the previous ones as the
+// before-picture of a reconcile.
+function recordServerState(songs) {
   serverSnapshot = new Map();
-  createdIds = new Map();
+  serverTokens = new Map();
   for (const s of songs) {
-    if (s && typeof s.wpId === "number") serverSnapshot.set(s.wpId, songContent(s));
+    if (s && typeof s.wpId === "number") {
+      serverSnapshot.set(s.wpId, songContent(s));
+      serverTokens.set(s.wpId, s.wpToken ?? null);
+    }
   }
+}
+
+// True if the token map from /library/state disagrees with what we last saw —
+// a song added, removed, or rewritten by someone else.
+function upstreamMoved(tokens) {
+  const keys = Object.keys(tokens);
+  if (keys.length !== serverTokens.size) return true;
+  return keys.some((k) => serverTokens.get(Number(k)) !== tokens[k]);
+}
+
+async function loadFromWp() {
+  const songs = await fetchLibrary();
+  recordServerState(songs);
+  // A full load replaces app state wholesale, so session-local bookkeeping goes
+  // with it. (syncUpstream deliberately keeps both — it reconciles into the
+  // library the user is already working in.)
+  createdIds = new Map();
+  heldWpIds = new Set();
   return songs;
 }
 
@@ -158,28 +236,34 @@ async function doWpSave(library, keepalive) {
 
   for (const song of songs) {
     const content = songContent(song);
-    const payload = (({ wpId: _drop, ...rest }) => rest)(song);
-    // A song's handle is its wpId, or one assigned to it earlier this session.
-    const wpId = song.wpId ?? createdIds.get(song.id) ?? null;
+    const payload = songPayload(song);
+    const wpId = handleOf(song);
 
     if (wpId) {
       seenWpIds.add(wpId);
+      // Held songs are awaiting a user decision; writing one would be the
+      // clobber the hold exists to prevent. Counted as seen above so the trash
+      // diff below doesn't mistake the skip for a deletion.
+      if (heldWpIds.has(wpId)) continue;
       if (serverSnapshot.get(wpId) !== content) {
         const res = await wpFetch("/songs/" + wpId, "PUT", payload, keepalive);
         if (res.status === 401 || res.status === 403) throw new AuthError();
+        if (res.status === 404) throw new MissingSongError();
         if (!res.ok) throw new Error("update failed: " + res.status);
         serverSnapshot.set(wpId, content);
+        serverTokens.set(wpId, (await readJson(res))?.wpToken ?? null);
       }
     } else {
       const res = await wpFetch("/songs", "POST", payload, keepalive);
       if (res.status === 401 || res.status === 403) throw new AuthError();
       if (!res.ok) throw new Error("create failed: " + res.status);
-      const created = await res.json();
+      const created = await readJson(res);
       const newId = created?.wpId;
       if (newId) {
         assignedIds[song.id] = newId;
         createdIds.set(song.id, newId);
         serverSnapshot.set(newId, content);
+        serverTokens.set(newId, created?.wpToken ?? null);
         seenWpIds.add(newId);
       }
     }
@@ -206,6 +290,7 @@ async function doWpSave(library, keepalive) {
     // A 404 (already gone) is fine; only hard-fail on other errors.
     if (!res.ok && res.status !== 404) throw new Error("delete failed: " + res.status);
     serverSnapshot.delete(wpId);
+    serverTokens.delete(wpId);
   }
 
   return assignedIds;
@@ -236,18 +321,23 @@ export async function loadLibrary() {
   return readBuffer();
 }
 
+// Server round-trips run one at a time: they all read and rewrite the snapshot
+// maps, so overlapping calls could double-create songs or reconcile against a
+// half-updated picture.
+let chain = Promise.resolve();
+
+function serialize(fn) {
+  const result = chain.then(fn, fn);
+  chain = result.catch(() => {});
+  return result;
+}
+
 // Persist the library.
 //   Local mode:  writes the whole blob. -> { ok }
 //   WP mode:     mirrors to the buffer, then diffs and saves per-song.
 //                -> { ok, offline, authExpired, readOnly, assignedIds }
-// Saves are serialized (see `chain`) so overlapping calls can't double-create.
-let chain = Promise.resolve();
-
 export function saveLibrary(library, opts = {}) {
-  const run = () => doSave(library, opts);
-  const result = chain.then(run, run);
-  chain = result.catch(() => {});
-  return result;
+  return serialize(() => doSave(library, opts));
 }
 
 async function doSave(library, opts) {
@@ -272,9 +362,136 @@ async function doSave(library, opts) {
     if (e instanceof StaleSnapshotError) {
       return { ok: false, stale: true };
     }
+    if (e instanceof MissingSongError) {
+      return { ok: false, diverged: true };
+    }
     // Network error or server hiccup — changes are safe in the buffer.
     return { ok: false, offline: true };
   }
+}
+
+// Reconcile this tab against the server, for the case where the same library is
+// open on another machine.
+//
+// Cheap path first: one token request, and if nothing moved upstream we're done
+// without transferring a single song. When something did move, the per-song
+// diff means most of it still isn't a conflict — a song someone else edited
+// that this tab hasn't touched can simply be adopted, and one added elsewhere
+// can simply be pulled in. Only a song edited in *both* places, or edited here
+// and trashed there, needs the user; those get held back from saving until
+// they're resolved.
+//
+// Returns null when there's nothing to report (including offline — a failed
+// probe just means we reconcile later; edits stay safe in the buffer).
+//   -> { library, pulled, conflicts, orphans } | { authExpired: true } | null
+export function syncUpstream(library) {
+  if (!wpMode || !library) return Promise.resolve(null);
+  return serialize(() => doSync(library));
+}
+
+async function doSync(library) {
+  let prevSnapshot;
+  let prevTokens;
+  let serverSongs;
+
+  try {
+    if (!upstreamMoved(await fetchState())) return null;
+    // Hold the before-picture: "did this tab edit that song?" has to be asked
+    // against what the server held at our last sync, not what it holds now.
+    prevSnapshot = serverSnapshot;
+    prevTokens = serverTokens;
+    serverSongs = await fetchLibrary();
+    recordServerState(serverSongs);
+  } catch (e) {
+    if (e instanceof AuthError) return { authExpired: true };
+    return null;
+  }
+
+  const untouchedHere = (song, wpId) => prevSnapshot.get(wpId) === songContent(song);
+
+  const unclaimed = new Map(
+    serverSongs.filter((s) => typeof s.wpId === "number").map((s) => [s.wpId, s])
+  );
+  const merged = [];
+  const conflicts = [];
+  const orphans = [];
+  let pulled = 0;
+
+  // Walk the local library first so this tab's song order survives the merge;
+  // anything genuinely new to us lands at the end.
+  for (const local of library.songs) {
+    const wpId = handleOf(local);
+    if (wpId == null) {
+      merged.push(local); // created here, never saved — nothing to reconcile
+      continue;
+    }
+
+    const server = unclaimed.get(wpId);
+
+    if (!server) {
+      // Trashed on the other machine.
+      if (untouchedHere(local, wpId)) {
+        pulled++; // drop it here too
+        continue;
+      }
+      orphans.push({ wpId, id: local.id, name: local.name });
+      heldWpIds.add(wpId);
+      merged.push(local);
+      continue;
+    }
+
+    unclaimed.delete(wpId);
+
+    if (prevTokens.get(wpId) === server.wpToken) {
+      merged.push(local); // unchanged upstream — this tab's copy stands
+      continue;
+    }
+    if (untouchedHere(local, wpId)) {
+      merged.push(server); // changed upstream only — adopt it
+      pulled++;
+      continue;
+    }
+
+    conflicts.push({ wpId, id: local.id, name: local.name, theirs: server });
+    heldWpIds.add(wpId);
+    merged.push(local);
+  }
+
+  for (const server of unclaimed.values()) {
+    merged.push(server); // added on the other machine
+    pulled++;
+  }
+
+  if (!pulled && !conflicts.length && !orphans.length) return null;
+
+  const activeId = merged.some((s) => s.id === library.activeId)
+    ? library.activeId
+    : merged[0]?.id ?? null;
+
+  const reconciled = { ...library, songs: merged, activeId };
+  // Keep the offline copy current here too, not just on load and save: a
+  // reconcile can go a long time without a save behind it (nothing local was
+  // dirty), and going offline in that window shouldn't roll the tab back to a
+  // library the server has already moved past.
+  writeBuffer(reconciled);
+
+  return { library: reconciled, pulled, conflicts, orphans };
+}
+
+// Resolve a conflict or orphan: release the song's save hold so the next save
+// acts on whatever the app settled on. Keeping the local copy makes the next
+// diff overwrite theirs; taking theirs leaves nothing to write.
+export function releaseHold(wpId) {
+  heldWpIds.delete(wpId);
+}
+
+// Forget a song's server handle so the next save re-creates it as a fresh post.
+// For an orphan the user chose to keep: its old wpId names a trashed post that
+// PUT would only 404 on, and the app has stripped wpId from the song — but the
+// session-local handle would still resolve it, so that has to go too.
+export function forgetHandle(songId, wpId) {
+  createdIds.delete(songId);
+  heldWpIds.delete(wpId);
 }
 
 // Clear the local buffer (standalone "Reset"). No effect on server data.
