@@ -17,6 +17,9 @@ Named in a nod toward Lozenger, my band's informal name.
   bridge inside a 4/4 song, etc.).
 - **Visual + audible playback** — click metronome (with optional count-in)
   plus a progress fill that highlights and auto-scrolls to the active part.
+- **Screen flash** — an optional full-screen flash on every beat, hard on the
+  downbeat and dim on the rest, driven off the same audio clock as the click so
+  it can't drift. Both playback toggles (click, flash) persist per device.
 - **Multiple songs** in a single library, with a song switcher and per-song
   metadata (BPM, time, count-in bars).
 - **Per-part cues, colors, and sample links** — paste an mp3/wav URL on a

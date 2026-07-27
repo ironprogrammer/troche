@@ -254,6 +254,23 @@ select.sa-input { padding-right: 28px; appearance: none; -webkit-appearance: non
 .sa-metro:hover { border-color: var(--ink-dim); color: var(--ink); }
 .sa-metro.on { color: var(--accent); border-color: var(--accent); background: rgba(216,72,59,.06); }
 
+/* Beat flash overlay. Transparent at rest; the playback engine animates its
+   opacity per beat (Web Animations API, so the fade is composited off the
+   main thread) and swaps .downbeat on for accented beats.
+   Off-beat: dim, edge-weighted, the sheet stays readable underneath.
+   Downbeat: flat fill at near-full opacity — it can hide the sheet because
+   the engine keeps it to ~70ms. */
+.sa-flash {
+  position: fixed; inset: 0; z-index: 100;
+  pointer-events: none; opacity: 0;
+  background: radial-gradient(
+    ellipse at center,
+    color-mix(in srgb, var(--accent) 55%, transparent) 0%,
+    var(--accent) 100%
+  );
+}
+.sa-flash.downbeat { background: var(--accent); }
+
 .sa-input.sig { width: 84px; font-family: 'Spline Sans Mono', monospace; }
 .sa-input.editor-sig { width: auto; min-width: 170px; }
 .sa-sigbadge {

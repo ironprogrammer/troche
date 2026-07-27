@@ -1,7 +1,7 @@
-import { Play, Square, Volume2, VolumeX } from "lucide-react";
+import { Play, Square, Volume2, VolumeX, Zap, ZapOff } from "lucide-react";
 
 export function Transport({
-  playing, togglePlay, metronome, setMetronome,
+  playing, togglePlay, metronome, setMetronome, flash, setFlash,
   inCountIn, activePartId, curMeasure, curBeat, ciBeat,
   totalBeats, lengthLabel, barsLabel,
 }) {
@@ -23,6 +23,16 @@ export function Transport({
         aria-pressed={metronome}
       >
         {metronome ? <Volume2 size={16} /> : <VolumeX size={16} />}
+      </button>
+
+      <button
+        className={`sa-metro ${flash ? "on" : ""}`}
+        onClick={() => setFlash((f) => !f)}
+        title={flash ? "Screen flash on — tap to disable" : "Screen flash off — tap to enable"}
+        aria-pressed={flash}
+        aria-label="Flash the screen on each beat"
+      >
+        {flash ? <Zap size={16} /> : <ZapOff size={16} />}
       </button>
 
       <div className="sa-statuswrap">

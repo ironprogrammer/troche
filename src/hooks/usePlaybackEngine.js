@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { partSig } from "../utils.js";
+import { loadPrefs, savePrefs } from "../storage.js";
 
 // Timing model: one beat = one count = a constant duration set by BPM,
 // regardless of the time-sig denominator. A part just has `top` counts per
@@ -8,7 +9,11 @@ import { partSig } from "../utils.js";
 export function usePlaybackEngine(activeSong) {
   const [playing, setPlaying] = useState(false);
   const [elapsedBeats, setElapsedBeats] = useState(0);
-  const [metronome, setMetronome] = useState(true);
+  // Both toggles restore from the last session and persist on change.
+  const [metronome, setMetronome] = useState(() => loadPrefs().metronome);
+  const [flash, setFlash] = useState(() => loadPrefs().flash);
+  useEffect(() => { savePrefs({ metronome }); }, [metronome]);
+  useEffect(() => { savePrefs({ flash }); }, [flash]);
 
   const rafRef = useRef(null);
   const startRef = useRef(0);        // audioCtx time corresponding to timeline beat 0
@@ -17,6 +22,15 @@ export function usePlaybackEngine(activeSong) {
   const nextBeatRef = useRef(0);     // index of the next beat to schedule (negative during count-in)
   const metronomeRef = useRef(metronome);
   useEffect(() => { metronomeRef.current = metronome; }, [metronome]);
+  const flashRef = useRef(flash);
+  useEffect(() => { flashRef.current = flash; }, [flash]);
+
+  // Screen flash. The overlay element is driven imperatively rather than
+  // through React state: the beat times come off the same lookahead queue the
+  // clicks do, and the fade runs on the Web Animations API so the compositor
+  // owns it — neither the flash's start nor its decay waits on a render.
+  const flashElRef = useRef(null);
+  const flashQueueRef = useRef([]); // [{ t: audioCtx time, accent }] pending beats
 
   const secPerBeat = activeSong ? 60 / activeSong.bpm : 0.5;
   const masterTop = activeSong?.timeSigTop || 4;
@@ -104,6 +118,29 @@ export function usePlaybackEngine(activeSong) {
     src.start(when);
   };
 
+  // Downbeat: a hard, flat wash of the accent colour, gone in ~70ms — short
+  // enough to read as a strobe hit rather than a tint sitting over the chart.
+  // Off-beats: a dim edge-weighted wash that never obscures anything.
+  const fireFlash = (accent) => {
+    const el = flashElRef.current;
+    if (!el) return;
+    el.classList.toggle("downbeat", accent);
+    // Keep the flash inside its own beat so fast tempos don't smear into one
+    // another, and cancel any in-flight fade so a new beat starts clean.
+    const dur = Math.min(accent ? 70 : 110, secPerBeat * 1000 * 0.55);
+    for (const a of el.getAnimations()) a.cancel();
+    el.animate(
+      [{ opacity: accent ? 0.92 : 0.16 }, { opacity: 0 }],
+      { duration: dur, easing: accent ? "cubic-bezier(.2,0,.6,1)" : "ease-out" }
+    );
+  };
+
+  const clearFlash = () => {
+    flashQueueRef.current = [];
+    const el = flashElRef.current;
+    if (el) for (const a of el.getAnimations()) a.cancel();
+  };
+
   const stopScheduler = () => {
     if (schedulerRef.current) {
       clearInterval(schedulerRef.current);
@@ -116,6 +153,7 @@ export function usePlaybackEngine(activeSong) {
     setElapsedBeats(0);
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
     stopScheduler();
+    clearFlash();
   }, []);
 
   // lookahead scheduler: queues clicks ~100ms ahead against the audio clock
@@ -128,9 +166,15 @@ export function usePlaybackEngine(activeSong) {
       const beatTime = startRef.current + (idx + countInBeats) * secPerBeat;
       if (beatTime > ctx.currentTime + lookahead) break;
       if (idx >= totalBeats) break;
-      if (beatTime >= ctx.currentTime && metronomeRef.current) {
-        if (idx < 0) playStick(beatTime);
-        else playClick(beatTime, isDownbeat(idx));
+      if (beatTime >= ctx.currentTime) {
+        const accent = isDownbeat(idx);
+        if (metronomeRef.current) {
+          if (idx < 0) playStick(beatTime);
+          else playClick(beatTime, accent);
+        }
+        // Queued whether or not the flash is on, so toggling it mid-playback
+        // catches the very next beat instead of waiting out the lookahead.
+        flashQueueRef.current.push({ t: beatTime, accent });
       }
       nextBeatRef.current = idx + 1;
     }
@@ -145,11 +189,22 @@ export function usePlaybackEngine(activeSong) {
     // ahead of the audible click. Subtract the latency so the playhead
     // shows the position of the click currently reaching the speakers.
     const latency = ctx.outputLatency || ctx.baseLatency || 0;
-    const b = (ctx.currentTime - latency - startRef.current) / secPerBeat - countInBeats;
+    const now = ctx.currentTime - latency;
+    const b = (now - startRef.current) / secPerBeat - countInBeats;
+
+    // Flash the beats whose click has just reached the speakers. If a frame
+    // was long enough to swallow several beats, only the newest one flashes —
+    // stacking stale flashes would read as lag.
+    const queue = flashQueueRef.current;
+    let due = null;
+    while (queue.length && queue[0].t <= now) due = queue.shift();
+    if (due && flashRef.current) fireFlash(due.accent);
+
     if (b >= totalBeats) {
       setElapsedBeats(totalBeats);
       setPlaying(false);
       stopScheduler();
+      clearFlash();
       return;
     }
     setElapsedBeats(b);
@@ -172,6 +227,7 @@ export function usePlaybackEngine(activeSong) {
     const begin = !atEnd && elapsedBeats > 0 ? elapsedBeats : -countInBeats;
 
     const startSequence = () => {
+      clearFlash();
       // Prime the output pipeline with a silent buffer. On a freshly-resumed
       // context the audio subsystem can take ~1s to start delivering samples,
       // which silently swallows the first few clicks. The prime wakes it up.
@@ -253,6 +309,9 @@ export function usePlaybackEngine(activeSong) {
     elapsedBeats,
     metronome,
     setMetronome,
+    flash,
+    setFlash,
+    flashElRef,
     togglePlay,
     stop,
     // derived song shape

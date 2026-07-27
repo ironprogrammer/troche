@@ -1,4 +1,4 @@
-import { STORAGE_KEY } from "./constants.js";
+import { STORAGE_KEY, PREFS_KEY } from "./constants.js";
 
 // Persistence adapter.
 //
@@ -63,6 +63,29 @@ function writeBuffer(lib) {
   } catch (e) {
     console.error("buffer write failed", e);
     return false;
+  }
+}
+
+// ---- playback preferences ----
+
+const PREF_DEFAULTS = { metronome: true, flash: false };
+
+export function loadPrefs() {
+  try {
+    const value = get(PREFS_KEY);
+    if (value) return { ...PREF_DEFAULTS, ...JSON.parse(value) };
+  } catch {
+    // nothing saved, or parse failed — fall through to defaults
+  }
+  return { ...PREF_DEFAULTS };
+}
+
+// Patch-merged so each toggle can save itself without clobbering the other.
+export function savePrefs(patch) {
+  try {
+    set(PREFS_KEY, JSON.stringify({ ...loadPrefs(), ...patch }));
+  } catch (e) {
+    console.error("prefs write failed", e);
   }
 }
 

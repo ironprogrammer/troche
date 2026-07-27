@@ -1,5 +1,10 @@
 export const STORAGE_KEY = "troche:library:v1";
 
+// Playback toggles (click on/off, screen flash on/off). Deliberately separate
+// from the library: these are per-device playback preferences, not song data,
+// so they stay local even when songs live on a WordPress site.
+export const PREFS_KEY = "troche:prefs:v1";
+
 export const PALETTE = [
   "#e2574c", "#e08a3c", "#d9b13b", "#5fa055",
   "#3d8b8b", "#4571b0", "#7a5ba6", "#b0517f",
