@@ -4,7 +4,7 @@ Tags: music, band, arrangement, songwriting
 Requires at least: 6.9
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 1.0.2
+Stable tag: 1.1.0
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -66,6 +66,10 @@ Deleted songs go to the trash, and every save is kept as a revision, so you can
 restore either from the dashboard.
 
 == Changelog ==
+
+= 1.1.0 =
+* Add a screen flash: an optional full-screen flash on every beat, hard on the downbeat and dim on the rest, locked to the same clock as the click.
+* Remember the click and flash toggles between visits.
 
 = 1.0.2 =
 * Fix printing in Safari: no more blank second page; the printed/PDF output now matches Chrome.
