@@ -20,13 +20,19 @@ function check( $label, $cond ) {
 	$cond ? $pass++ : $fail++;
 	file_put_contents( $out, $line . "\n", FILE_APPEND );
 }
-function troche_rest( $method, $route, $body = null ) {
+function troche_rest( $method, $route, $body = null, $headers = array() ) {
 	$req = new WP_REST_Request( $method, $route );
 	if ( null !== $body ) {
 		$req->set_header( 'Content-Type', 'application/json' );
 		$req->set_body( wp_json_encode( $body ) );
 	}
+	foreach ( $headers as $name => $value ) {
+		$req->set_header( $name, $value );
+	}
 	return rest_do_request( $req );
+}
+function troche_tokens() {
+	return (array) troche_rest( 'GET', '/troche/v1/library/state' )->get_data()['tokens'];
 }
 
 // ---- post type ----
@@ -86,6 +92,89 @@ check( 'library now has 1 song', 1 === count( $data['songs'] ) );
 check( 'song carries wpId', ( $data['songs'][0]['wpId'] ?? 0 ) === $wp_id );
 check( 'unicode key round-trips', 'A♭' === ( $data['songs'][0]['musicalKey'] ?? '' ) );
 
+// ---- version tokens (upstream-change detection) ----
+$token = $data['songs'][0]['wpToken'] ?? '';
+check( 'song carries wpToken', is_string( $token ) && '' !== $token );
+check( 'create response carries wpToken', ! empty( $r->get_data()['wpToken'] ) );
+check( 'create token matches the library token', ( $r->get_data()['wpToken'] ?? null ) === $token );
+
+wp_set_current_user( 0 );
+check( 'GET /library/state logged-out -> 401', 401 === troche_rest( 'GET', '/troche/v1/library/state' )->get_status() );
+wp_set_current_user( $sub_id );
+$state = troche_rest( 'GET', '/troche/v1/library/state' );
+check( 'GET /library/state -> 200', 200 === $state->get_status() );
+$tokens = (array) ( $state->get_data()['tokens'] ?? array() );
+check( 'state lists one token, keyed by wpId', array( (string) $wp_id => $token ) === $tokens );
+
+// A save that rewrites identical content must not move the token — otherwise
+// every idle tab would see a phantom conflict.
+troche_rest( 'PUT', '/troche/v1/songs/' . $wp_id, $song );
+$same = (array) troche_rest( 'GET', '/troche/v1/library/state' )->get_data()['tokens'];
+check( 'token stable across an identical re-save', $token === ( $same[ (string) $wp_id ] ?? '' ) );
+
+// A real edit must move it.
+$edited        = $song;
+$edited['bpm'] = 140;
+troche_rest( 'PUT', '/troche/v1/songs/' . $wp_id, $edited );
+$moved = (array) troche_rest( 'GET', '/troche/v1/library/state' )->get_data()['tokens'];
+check( 'token changes when content changes', $token !== ( $moved[ (string) $wp_id ] ?? '' ) );
+check(
+	'update response token matches the new state token',
+	( troche_rest( 'PUT', '/troche/v1/songs/' . $wp_id, $edited )->get_data()['wpToken'] ?? null )
+		=== ( $moved[ (string) $wp_id ] ?? '' )
+);
+
+// wpToken is a transport handle, like wpId — it must never be stored.
+$stored_song = json_decode( get_post_field( 'post_content', $wp_id ), true );
+check( 'stored content omits wpToken', ! isset( $stored_song['wpToken'] ) );
+
+// ---- conditional writes (X-Troche-Expect-Token) ----
+// The client syncs before saving, but that check and the write aren't one
+// operation. This is what stops a save landing on a song that moved in between.
+$current            = troche_tokens()[ (string) $wp_id ] ?? '';
+$stale_write        = $song;
+$stale_write['bpm'] = 999;
+
+$refused = troche_rest(
+	'PUT',
+	'/troche/v1/songs/' . $wp_id,
+	$stale_write,
+	array( 'X-Troche-Expect-Token' => 'not-the-current-token' )
+);
+check( 'PUT with a stale token -> 409', 409 === $refused->get_status() );
+check( 'refused PUT names the conflict', 'troche_stale_token' === ( $refused->get_data()['code'] ?? '' ) );
+check( 'refused PUT hands back the current token', $current === ( $refused->get_data()['data']['wpToken'] ?? '' ) );
+check( 'refused PUT left the song alone', $current === ( troche_tokens()[ (string) $wp_id ] ?? '' ) );
+
+$accepted = troche_rest(
+	'PUT',
+	'/troche/v1/songs/' . $wp_id,
+	$stale_write,
+	array( 'X-Troche-Expect-Token' => $current )
+);
+check( 'PUT with the current token -> 200', 200 === $accepted->get_status() );
+check( 'accepted PUT landed', 999 === (int) ( troche_rest( 'GET', '/troche/v1/library' )->get_data()['songs'][0]['bpm'] ?? 0 ) );
+check( 'accepted PUT moved the token', $current !== ( troche_tokens()[ (string) $wp_id ] ?? '' ) );
+
+// A caller that doesn't track tokens (or a header a proxy stripped) still
+// writes, exactly as this endpoint always did.
+check( 'PUT with no token header still writes', 200 === troche_rest( 'PUT', '/troche/v1/songs/' . $wp_id, $edited )->get_status() );
+
+// ---- /library/state agrees with /library about what exists ----
+// A post the library skips must not appear in state, or every probe would read
+// as drift and pull the whole library down again.
+$junk_id = wp_insert_post(
+	array(
+		'post_type'    => 'troche_song',
+		'post_status'  => 'publish',
+		'post_title'   => 'Not JSON',
+		'post_content' => 'this is not a song',
+	)
+);
+check( 'unparseable post excluded from library', 1 === count( troche_rest( 'GET', '/troche/v1/library' )->get_data()['songs'] ) );
+check( 'unparseable post excluded from state', ! isset( troche_tokens()[ (string) $junk_id ] ) );
+wp_delete_post( $junk_id, true );
+
 // ---- wp-admin cap mapping (post-type actions gate on troche_edit, not core post caps) ----
 $editor_id = wp_insert_user(
 	array(
@@ -125,6 +214,10 @@ check( 'PUT bad id -> 404', 404 === troche_rest( 'PUT', '/troche/v1/songs/999999
 check( 'DELETE /songs/{id} -> 200', 200 === troche_rest( 'DELETE', '/troche/v1/songs/' . $wp_id )->get_status() );
 check( 'post moved to trash (not hard-deleted)', 'trash' === get_post_status( $wp_id ) );
 check( 'trashed song excluded from library', 0 === count( troche_rest( 'GET', '/troche/v1/library' )->get_data()['songs'] ) );
+// The client reads a song's absence from state as "trashed elsewhere", so this
+// is what makes deletions propagate to the other machine at all.
+check( 'trashed song excluded from state', ! isset( troche_tokens()[ (string) $wp_id ] ) );
+check( 'PUT to a trashed song -> 404, not 409', 404 === troche_rest( 'PUT', '/troche/v1/songs/' . $wp_id, $song, array( 'X-Troche-Expect-Token' => 'anything' ) )->get_status() );
 
 // ---- server assigns an id when missing ----
 $r      = troche_rest( 'POST', '/troche/v1/songs', array( 'name' => 'No Id', 'parts' => array() ) );

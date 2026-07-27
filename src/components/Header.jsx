@@ -30,6 +30,7 @@ function StatusPill({ state, loginUrl, onSave, onReload }) {
     offline: { icon: <WifiOff size={15} />, label: "Offline — changes kept locally" },
     expired: { icon: <TriangleAlert size={15} />, label: "Session expired" },
     stale: { icon: <TriangleAlert size={15} />, label: "Reload before saving" },
+    conflict: { icon: <TriangleAlert size={15} />, label: "Changed on another device" },
     viewonly: { icon: <Eye size={15} />, label: "View only" },
   };
   const s = map[state] || map.saved;

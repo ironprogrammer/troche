@@ -79,6 +79,14 @@ each song as a revisioned custom post, and exposes it under a URL slug you
 choose (default `/troche`). Viewing requires being logged in; editing requires
 a capability you grant per user on **Settings → Troche**.
 
+Because saving is per song rather than per library, having the app open on two
+machines is safe: when a tab comes back into view, and again before it saves, it
+checks which songs have moved and folds in anything it hasn't touched itself.
+Only a song edited in both places at once needs a decision, and it says so
+rather than overwriting quietly. Saves are conditional on the version the tab
+last saw, so even a write that races another machine is refused and turned into
+that same question.
+
 ### Build
 
 ```bash

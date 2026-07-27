@@ -1,11 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Music, Plus, RotateCcw } from "lucide-react";
 import { PALETTE } from "./constants.js";
-import { uid, normalizeLibrary } from "./utils.js";
+import { uid, normalizeLibrary, mergeFlags } from "./utils.js";
 import { defaultLibrary, defaultSong } from "./defaults.js";
 import {
   loadLibrary,
   saveLibrary,
+  syncUpstream,
+  releaseHold,
+  forgetHandle,
+  cacheLibrary,
   clearBuffer,
   wpMode,
   canEdit,
@@ -17,6 +21,7 @@ import { Header } from "./components/Header.jsx";
 import { Transport } from "./components/Transport.jsx";
 import { PartBlock } from "./components/PartBlock.jsx";
 import { PrintChart } from "./components/PrintChart.jsx";
+import { SyncNotice } from "./components/SyncNotice.jsx";
 import { styles, css } from "./styles.js";
 
 // Matches the CSS mobile breakpoint (see styles.js). Used to drop the
@@ -33,6 +38,15 @@ function useIsMobile() {
     return () => mq.removeEventListener("change", on);
   }, []);
   return m;
+}
+
+// The app renders off an active song, so the library must never reach zero.
+// A blank song stands in — the same fallback a fresh, empty install gets, and
+// left un-dirty so it's never pushed to everyone's server on its own.
+function ensureNonEmpty(lib) {
+  if (lib.songs.length) return lib;
+  const blank = defaultSong("New Song");
+  return { ...lib, songs: [blank], activeId: blank.id };
 }
 
 export default function App() {
@@ -70,6 +84,15 @@ export default function App() {
 
   // brief confirmation that a share link was copied
   const [shareFlash, setShareFlash] = useState(false);
+
+  // Songs another machine changed that need a decision before they can save
+  // again: { kind: "conflict" | "orphan", wpId, id, name, theirs? }. Their
+  // writes are held in storage.js until resolved; the rest of the library
+  // keeps autosaving normally.
+  const [flags, setFlags] = useState([]);
+
+  // Count of songs quietly pulled in from another machine, for a passing note.
+  const [pullFlash, setPullFlash] = useState(0);
 
   useEffect(() => {
     // Consume the shared payload (if any) before loading from storage. The
@@ -321,12 +344,103 @@ export default function App() {
     }));
   }, []);
 
+  // Pull down anything another machine changed and fold it into local state.
+  // Songs this tab hasn't touched are adopted silently; only genuine conflicts
+  // surface. Returns the library to work from — the merged one when something
+  // came in, the current one otherwise.
+  const runSync = useCallback(async () => {
+    const current = libraryRef.current;
+    if (!wpMode || !current) return current;
+
+    const result = await syncUpstream(current);
+    if (!result) return current;
+    if (result.authExpired) {
+      setWpStatus("expired");
+      return current;
+    }
+
+    const merged = ensureNonEmpty(result.library);
+    setLibrary(merged);
+    setFlags((cur) => mergeFlags(cur, result.conflicts, result.orphans));
+    if (result.pulled) {
+      setPullFlash(result.pulled);
+      setTimeout(() => setPullFlash(0), 6000);
+    }
+    return merged;
+  }, []);
+
+  const dismissFlag = (wpId) => setFlags((cur) => cur.filter((f) => f.wpId !== wpId));
+
+  // Apply a resolution to local state and to the offline buffer together.
+  // Resolving in favour of the server leaves nothing to save — local already
+  // matches — and the buffer is otherwise only written by a save, so without
+  // this it would go on serving the copy the user just rejected to the next
+  // offline reload.
+  const applyResolution = (next) => {
+    setLibrary(next);
+    cacheLibrary(next);
+  };
+
+  // Conflict → keep this tab's copy. Releasing the hold lets the next save
+  // overwrite the other machine's version; that version stays recoverable from
+  // the song's revisions in wp-admin.
+  const keepMine = (flag) => {
+    releaseHold(flag.wpId);
+    dismissFlag(flag.wpId);
+    setDirty(true);
+  };
+
+  // Conflict → take the other machine's copy, dropping this tab's edits to that
+  // song. Its id stays local so the active-song selection survives.
+  const useTheirs = (flag) => {
+    releaseHold(flag.wpId);
+    const cur = libraryRef.current;
+    applyResolution({
+      ...cur,
+      songs: cur.songs.map((s) => (s.id === flag.id ? { ...flag.theirs, id: s.id } : s)),
+    });
+    dismissFlag(flag.wpId);
+  };
+
+  // Orphan → keep a song that was trashed elsewhere. Dropping its server handle
+  // makes the next save re-create it rather than PUT to a trashed post.
+  const keepDeleted = (flag) => {
+    forgetHandle(flag.id, flag.wpId);
+    const cur = libraryRef.current;
+    applyResolution({
+      ...cur,
+      songs: cur.songs.map((s) =>
+        s.id === flag.id ? (({ wpId, wpToken, ...rest }) => rest)(s) : s
+      ),
+    });
+    dismissFlag(flag.wpId);
+    setDirty(true);
+  };
+
+  // Orphan → accept the deletion here too.
+  const discardDeleted = (flag) => {
+    releaseHold(flag.wpId);
+    const cur = libraryRef.current;
+    const songs = cur.songs.filter((s) => s.id !== flag.id);
+    const activeId = songs.some((s) => s.id === cur.activeId)
+      ? cur.activeId
+      : songs[0]?.id ?? null;
+    applyResolution(ensureNonEmpty({ ...cur, songs, activeId }));
+    dismissFlag(flag.wpId);
+  };
+
   // The single save path used by autosave, the manual Save button (local mode),
   // and manual retries. Reads the latest library through the ref.
   const runSave = useCallback(
     async (opts = {}) => {
-      const lib = libraryRef.current;
+      let lib = libraryRef.current;
       if (!lib) return;
+
+      // Reconcile first, so a save that has been sitting in the debounce window
+      // can't push over something that landed from another machine meanwhile.
+      if (wpMode) lib = await runSync();
+      if (!lib) return;
+
       setSaving(true);
       const res = await saveLibrary(lib, opts);
       setSaving(false);
@@ -345,11 +459,15 @@ export default function App() {
         setWpStatus("expired");
       } else if (res.stale) {
         setWpStatus("stale");
+      } else if (res.diverged) {
+        // A song was trashed elsewhere between the sync and the write. Resync
+        // to classify it and surface the choice.
+        runSync();
       } else if (res.offline) {
         setWpStatus("offline");
       }
     },
-    [adoptWpIds]
+    [adoptWpIds, runSync]
   );
 
   const handleSave = () => {
@@ -368,6 +486,12 @@ export default function App() {
 
   // Best-effort flush when the tab is hidden or unloaded, so edits inside the
   // debounce window aren't lost. WP saves use keepalive so they survive unload.
+  // Coming back to a visible tab is the other half: it's exactly the moment
+  // this laptop might have gone stale against another one, so reconcile then
+  // rather than polling in the background.
+  const syncRef = useRef(runSync);
+  syncRef.current = runSync;
+
   useEffect(() => {
     const flush = () => {
       if (!dirtyRef.current || !libraryRef.current) return;
@@ -375,6 +499,7 @@ export default function App() {
     };
     const onVis = () => {
       if (document.visibilityState === "hidden") flush();
+      else syncRef.current();
     };
     document.addEventListener("visibilitychange", onVis);
     window.addEventListener("pagehide", flush);
@@ -557,6 +682,8 @@ export default function App() {
       ? "expired"
       : wpStatus === "stale"
       ? "stale"
+      : flags.length
+      ? "conflict"
       : wpStatus === "offline"
       ? "offline"
       : dirty
@@ -604,6 +731,15 @@ export default function App() {
           saveState={saveState}
           loginUrl={loginUrl}
           onReload={() => window.location.reload()}
+        />
+
+        <SyncNotice
+          flags={flags}
+          pulled={pullFlash}
+          onKeepMine={keepMine}
+          onUseTheirs={useTheirs}
+          onKeepDeleted={keepDeleted}
+          onDiscardDeleted={discardDeleted}
         />
 
         <Transport

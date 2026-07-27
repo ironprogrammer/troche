@@ -3,9 +3,17 @@
  * REST endpoints under troche/v1.
  *
  * - GET    /library        Whole library in the envelope format (login required).
+ * - GET    /library/state  Per-song version tokens, no content (login required).
  * - POST   /songs          Create a song              (troche_edit required).
  * - PUT    /songs/{id}      Update a song              (troche_edit required).
  * - DELETE /songs/{id}      Trash a song               (troche_edit required).
+ *
+ * PUT honours an optional X-Troche-Expect-Token header carrying the version
+ * token the client last saw; the update is refused with 409 if the song has
+ * moved since. A custom header rather than If-Match on purpose: an If-Match a
+ * proxy or cache decides to evaluate itself would fail the save outright,
+ * whereas a stripped custom header just degrades to the unconditional write
+ * this endpoint has always done.
  *
  * Auth is cookie + nonce (same-origin); there is no CORS surface. Reads gate on
  * being logged in; writes gate on the troche_edit capability.
@@ -40,6 +48,16 @@ class Rest_Controller {
 			array(
 				'methods'             => \WP_REST_Server::READABLE,
 				'callback'            => array( $this, 'get_library' ),
+				'permission_callback' => array( $this, 'can_read' ),
+			)
+		);
+
+		register_rest_route(
+			self::NAMESPACE,
+			'/library/state',
+			array(
+				'methods'             => \WP_REST_Server::READABLE,
+				'callback'            => array( $this, 'get_state' ),
 				'permission_callback' => array( $this, 'can_read' ),
 			)
 		);
@@ -112,6 +130,19 @@ class Rest_Controller {
 	}
 
 	/**
+	 * Return per-song version tokens so a client can tell, in one small
+	 * request, whether anything changed under it since its last sync.
+	 *
+	 * @return \WP_REST_Response
+	 */
+	public function get_state() {
+		$response = rest_ensure_response( Store::get_state() );
+		// Freshness is the whole point — never let a cache answer this.
+		$response->header( 'Cache-Control', 'no-store, max-age=0' );
+		return $response;
+	}
+
+	/**
 	 * Create a song from the request body.
 	 *
 	 * @param \WP_REST_Request $request Request.
@@ -151,8 +182,11 @@ class Rest_Controller {
 			);
 		}
 
+		// Only meaningful on an update; a create has nothing to be stale against.
+		$expect = $wp_id ? $request->get_header( 'x_troche_expect_token' ) : null;
+
 		$song  = Store::sanitize_song( $body );
-		$saved = Store::save_song( $song, $wp_id, get_current_user_id() );
+		$saved = Store::save_song( $song, $wp_id, get_current_user_id(), $expect );
 
 		if ( is_wp_error( $saved ) ) {
 			return $saved;

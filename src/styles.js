@@ -114,11 +114,26 @@ export const css = `
 .sa-savestate.offline { color: #b0692c; }
 .sa-savestate.expired { color: var(--accent); }
 .sa-savestate.stale { color: var(--accent); }
+.sa-savestate.conflict { color: var(--accent); }
 /* Clickable states (Unsaved → save now, Offline → retry) read as actions. */
 .sa-savestate.clickable { cursor: pointer; }
 .sa-savestate.clickable.pending { color: var(--accent); }
 .sa-savestate.clickable:hover { text-decoration: underline; }
 a.sa-savestate.expired:hover { text-decoration: underline; }
+
+/* Sync notice strip (WP mode) — what arrived from another device, and the
+   per-song choices for anything that needs one. */
+.sa-sync {
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 8px 0 2px;
+}
+.sa-sync-row {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  font-size: 13px; color: var(--accent);
+}
+.sa-sync-row.info { color: var(--ink-dim); }
+.sa-sync-text { flex: 1 1 auto; min-width: 180px; }
+.sa-sync-row .sa-btn { padding: 4px 10px; font-size: 12px; }
 
 .sa-switcher {
   display: flex; align-items: center; gap: 8px;
