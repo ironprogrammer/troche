@@ -185,12 +185,17 @@ class Store {
 	/**
 	 * Create or update one song.
 	 *
-	 * @param array    $song  Sanitized song object.
-	 * @param int|null $wp_id Existing post id to update, or null to create.
-	 * @param int      $user  Author id for new posts.
+	 * @param array       $song   Sanitized song object.
+	 * @param int|null    $wp_id  Existing post id to update, or null to create.
+	 * @param int         $user   Author id for new posts.
+	 * @param string|null $expect Version token the caller believes is current.
+	 *                            When given, the update only lands if the stored
+	 *                            token still matches; otherwise 409. Null skips
+	 *                            the check (creates, and callers that don't
+	 *                            track tokens).
 	 * @return array|\WP_Error The saved song (with wpId), or an error.
 	 */
-	public static function save_song( array $song, $wp_id, $user ) {
+	public static function save_song( array $song, $wp_id, $user, $expect = null ) {
 		$title = isset( $song['name'] ) && '' !== trim( (string) $song['name'] )
 			? (string) $song['name']
 			: __( 'Untitled Song', 'troche' );
@@ -225,6 +230,26 @@ class Store {
 					array( 'status' => 404 )
 				);
 			}
+
+			// Conditional write. The client syncs before saving, but that check
+			// and this write aren't one operation — another machine can land a
+			// save in between. Comparing tokens here, immediately before the
+			// write, is what makes "your edit never disappears" true rather
+			// than merely likely. A mismatch is not an error the user needs to
+			// see: the client reconciles and asks, naming the song.
+			$current = self::token( $existing->post_content );
+			if ( null !== $expect && $expect !== $current ) {
+				return new \WP_Error(
+					'troche_stale_token',
+					__( 'That song changed somewhere else since you last synced.', 'troche' ),
+					array(
+						'status'  => 409,
+						'wpId'    => (int) $wp_id,
+						'wpToken' => $current,
+					)
+				);
+			}
+
 			$postarr['ID'] = (int) $wp_id;
 			$result        = wp_update_post( $postarr, true );
 		} else {

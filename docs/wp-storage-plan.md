@@ -81,6 +81,11 @@ subpath and the plugin directory.
   edited here and trashed there, surfaces to the user — those are held back
   from saving until resolved, while the rest of the library keeps autosaving.
   Whichever copy loses is still recoverable from the song's revisions.
+  Checking before a save narrows the window but can't close it — the check and
+  the write aren't one operation — so `PUT` is conditional: it carries the token
+  the client last saw in `X-Troche-Expect-Token` and the server refuses with 409
+  if the song moved in between. A refusal reconciles and surfaces the same
+  per-song choice, so a lost race is a question, never a silent overwrite.
 - **Share/Export/Import stay functionally untouched** in both modes (one
   codebase; they're client-side and cost nothing). Export/Import double as the
   seeding path: each bandmate exports their existing localStorage library and

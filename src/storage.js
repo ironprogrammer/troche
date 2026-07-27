@@ -135,7 +135,7 @@ function wpUrl(path) {
   return wpConfig.restUrl + path;
 }
 
-async function wpFetch(path, method, body, keepalive) {
+async function wpFetch(path, method, body, keepalive, expectToken) {
   const res = await fetch(wpUrl(path), {
     method,
     credentials: "same-origin",
@@ -143,6 +143,11 @@ async function wpFetch(path, method, body, keepalive) {
     headers: {
       "Content-Type": "application/json",
       "X-WP-Nonce": wpConfig.nonce,
+      // Present only when we know what the server held, so the write can be
+      // refused if that's no longer true. Omitted (unconditional write) when we
+      // have no token to offer — an older plugin, or a response we couldn't
+      // parse — which is exactly the behaviour this had before.
+      ...(expectToken ? { "X-Troche-Expect-Token": expectToken } : null),
     },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
@@ -174,6 +179,12 @@ class StaleSnapshotError extends Error {}
 // is what it used to be reported as: a sync reclassifies the song as an orphan
 // and asks whether to keep or discard it.
 class MissingSongError extends Error {}
+
+// Thrown when the server refuses an update because the song moved under us
+// (409). Syncing before a save narrows that window but can't close it — the
+// check and the write aren't one operation. Handled exactly like a 404: unwind,
+// reconcile, and let the song be flagged if it's a genuine conflict.
+class StaleTokenError extends Error {}
 
 async function fetchLibrary() {
   const res = await wpFetch("/library", "GET");
@@ -246,9 +257,16 @@ async function doWpSave(library, keepalive) {
       // diff below doesn't mistake the skip for a deletion.
       if (heldWpIds.has(wpId)) continue;
       if (serverSnapshot.get(wpId) !== content) {
-        const res = await wpFetch("/songs/" + wpId, "PUT", payload, keepalive);
+        const res = await wpFetch(
+          "/songs/" + wpId,
+          "PUT",
+          payload,
+          keepalive,
+          serverTokens.get(wpId)
+        );
         if (res.status === 401 || res.status === 403) throw new AuthError();
         if (res.status === 404) throw new MissingSongError();
+        if (res.status === 409) throw new StaleTokenError();
         if (!res.ok) throw new Error("update failed: " + res.status);
         serverSnapshot.set(wpId, content);
         serverTokens.set(wpId, (await readJson(res))?.wpToken ?? null);
@@ -362,7 +380,9 @@ async function doSave(library, opts) {
     if (e instanceof StaleSnapshotError) {
       return { ok: false, stale: true };
     }
-    if (e instanceof MissingSongError) {
+    // Trashed elsewhere, or rewritten elsewhere between our sync and our write.
+    // Either way the library moved under us: reconcile and let that classify it.
+    if (e instanceof MissingSongError || e instanceof StaleTokenError) {
       return { ok: false, diverged: true };
     }
     // Network error or server hiccup — changes are safe in the buffer.
@@ -492,6 +512,14 @@ export function releaseHold(wpId) {
 export function forgetHandle(songId, wpId) {
   createdIds.delete(songId);
   heldWpIds.delete(wpId);
+}
+
+// Mirror the library to the offline buffer without touching the server. For the
+// changes that need no save to be correct — resolving a conflict in the
+// server's favour leaves local already matching it — where waiting for the next
+// save would leave the buffer holding a copy the user has discarded.
+export function cacheLibrary(library) {
+  if (library) writeBuffer(library);
 }
 
 // Clear the local buffer (standalone "Reset"). No effect on server data.

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Music, Plus, RotateCcw } from "lucide-react";
 import { PALETTE } from "./constants.js";
-import { uid, normalizeLibrary } from "./utils.js";
+import { uid, normalizeLibrary, mergeFlags } from "./utils.js";
 import { defaultLibrary, defaultSong } from "./defaults.js";
 import {
   loadLibrary,
@@ -9,6 +9,7 @@ import {
   syncUpstream,
   releaseHold,
   forgetHandle,
+  cacheLibrary,
   clearBuffer,
   wpMode,
   canEdit,
@@ -360,23 +361,7 @@ export default function App() {
 
     const merged = ensureNonEmpty(result.library);
     setLibrary(merged);
-    setFlags((cur) => {
-      const incoming = [
-        ...result.conflicts.map((c) => ({ ...c, kind: "conflict" })),
-        ...result.orphans.map((o) => ({ ...o, kind: "orphan" })),
-      ];
-      // Later syncs won't re-flag a song already flagged — the snapshot has
-      // moved on to the server's copy — so unresolved entries have to be kept
-      // rather than replaced, or the song's save hold would strand it.
-      // An orphan supersedes an earlier conflict on the same song: once it's
-      // been trashed elsewhere, "use theirs" no longer means anything.
-      const superseded = new Set(
-        incoming.filter((f) => f.kind === "orphan").map((f) => f.wpId)
-      );
-      const kept = cur.filter((f) => !superseded.has(f.wpId));
-      const seen = new Set(kept.map((f) => f.wpId));
-      return [...kept, ...incoming.filter((f) => !seen.has(f.wpId))];
-    });
+    setFlags((cur) => mergeFlags(cur, result.conflicts, result.orphans));
     if (result.pulled) {
       setPullFlash(result.pulled);
       setTimeout(() => setPullFlash(0), 6000);
@@ -385,6 +370,16 @@ export default function App() {
   }, []);
 
   const dismissFlag = (wpId) => setFlags((cur) => cur.filter((f) => f.wpId !== wpId));
+
+  // Apply a resolution to local state and to the offline buffer together.
+  // Resolving in favour of the server leaves nothing to save — local already
+  // matches — and the buffer is otherwise only written by a save, so without
+  // this it would go on serving the copy the user just rejected to the next
+  // offline reload.
+  const applyResolution = (next) => {
+    setLibrary(next);
+    cacheLibrary(next);
+  };
 
   // Conflict → keep this tab's copy. Releasing the hold lets the next save
   // overwrite the other machine's version; that version stays recoverable from
@@ -399,10 +394,11 @@ export default function App() {
   // song. Its id stays local so the active-song selection survives.
   const useTheirs = (flag) => {
     releaseHold(flag.wpId);
-    setLibrary((cur) => ({
+    const cur = libraryRef.current;
+    applyResolution({
       ...cur,
       songs: cur.songs.map((s) => (s.id === flag.id ? { ...flag.theirs, id: s.id } : s)),
-    }));
+    });
     dismissFlag(flag.wpId);
   };
 
@@ -410,12 +406,13 @@ export default function App() {
   // makes the next save re-create it rather than PUT to a trashed post.
   const keepDeleted = (flag) => {
     forgetHandle(flag.id, flag.wpId);
-    setLibrary((cur) => ({
+    const cur = libraryRef.current;
+    applyResolution({
       ...cur,
       songs: cur.songs.map((s) =>
         s.id === flag.id ? (({ wpId, wpToken, ...rest }) => rest)(s) : s
       ),
-    }));
+    });
     dismissFlag(flag.wpId);
     setDirty(true);
   };
@@ -423,13 +420,12 @@ export default function App() {
   // Orphan → accept the deletion here too.
   const discardDeleted = (flag) => {
     releaseHold(flag.wpId);
-    setLibrary((cur) => {
-      const songs = cur.songs.filter((s) => s.id !== flag.id);
-      const activeId = songs.some((s) => s.id === cur.activeId)
-        ? cur.activeId
-        : songs[0]?.id ?? null;
-      return ensureNonEmpty({ ...cur, songs, activeId });
-    });
+    const cur = libraryRef.current;
+    const songs = cur.songs.filter((s) => s.id !== flag.id);
+    const activeId = songs.some((s) => s.id === cur.activeId)
+      ? cur.activeId
+      : songs[0]?.id ?? null;
+    applyResolution(ensureNonEmpty({ ...cur, songs, activeId }));
     dismissFlag(flag.wpId);
   };
 

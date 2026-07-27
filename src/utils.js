@@ -57,6 +57,33 @@ export function normalizeLibrary(library) {
   return { library: { ...library, songs, activeId }, changed };
 }
 
+// Fold a sync's conflicts and orphans into the list of songs awaiting a
+// decision, keyed by wpId.
+//
+// A flagged song that this sync didn't mention stays flagged: dismissing a flag
+// is what releases that song's save hold, so dropping one would strand it
+// unsaveable. A song the sync *did* mention adopts the new entry — the other
+// machine has moved again, and "Use theirs" has to mean their copy as it stands
+// now, not the one we first saw (taking the stale copy would push it straight
+// back over their newer one). Existing entries keep their position so the
+// notice strip doesn't reshuffle under the user; genuinely new ones append.
+//
+// An orphan arriving for a song already flagged as a conflict supersedes it by
+// the same rule — once it's been trashed elsewhere there is no "theirs" left.
+export function mergeFlags(current, conflicts = [], orphans = []) {
+  const incoming = [
+    ...conflicts.map((c) => ({ ...c, kind: "conflict" })),
+    ...orphans.map((o) => ({ ...o, kind: "orphan" })),
+  ];
+  const byWpId = new Map(incoming.map((f) => [f.wpId, f]));
+  const alreadyFlagged = new Set(current.map((f) => f.wpId));
+
+  return [
+    ...current.map((f) => byWpId.get(f.wpId) ?? f),
+    ...incoming.filter((f) => !alreadyFlagged.has(f.wpId)),
+  ];
+}
+
 export function clampNum(v, min, max, fallback) {
   const n = Number(v);
   if (Number.isNaN(n)) return fallback;

@@ -1,6 +1,6 @@
 // Unit tests for pure client logic (no browser, no WordPress).
 //   node tests/unit.mjs     # or: npm run test:unit
-import { normalizeLibrary } from "../src/utils.js";
+import { normalizeLibrary, mergeFlags } from "../src/utils.js";
 
 let pass = 0;
 let fail = 0;
@@ -48,6 +48,38 @@ check("no double-suffix", !r2.library.songs.some((s) => /\(\d+\) \(\d+\)/.test(s
 // A clean library is left untouched.
 const r3 = normalizeLibrary({ activeId: "a", songs: [{ id: "a", name: "One" }, { id: "b", name: "Two" }] });
 check("clean library unchanged", r3.changed === false);
+
+// ---- mergeFlags: the songs a sync says need a decision ----
+
+const conflict = (wpId, bpm) => ({ wpId, id: "s" + wpId, name: "S" + wpId, theirs: { bpm } });
+const orphan = (wpId) => ({ wpId, id: "s" + wpId, name: "S" + wpId });
+
+let f = mergeFlags([], [conflict(2, 155)], []);
+check("a conflict is flagged", f.length === 1 && f[0].kind === "conflict");
+check("a conflict carries their copy", f[0].theirs.bpm === 155);
+
+// Dismissing a flag is what releases that song's save hold, so a flag the sync
+// didn't mention has to survive — dropping it would strand the song unsaveable.
+f = mergeFlags(f, [], []);
+check("a flag the sync didn't mention survives", f.length === 1 && f[0].wpId === 2);
+
+// Re-reported: the other machine moved again, so their copy has to move with
+// it. Keeping the first one would push a stale version back over their newer.
+f = mergeFlags(f, [conflict(2, 175)], []);
+check("a re-reported song isn't duplicated", f.length === 1);
+check("a re-reported song adopts the newer copy", f[0].theirs.bpm === 175);
+
+// Trashed elsewhere after the conflict: there's no "theirs" left to take.
+f = mergeFlags(f, [], [orphan(2)]);
+check("an orphan supersedes a conflict on the same song", f.length === 1 && f[0].kind === "orphan");
+
+// Existing entries hold their place; new ones append.
+f = mergeFlags([conflict(2, 1), conflict(3, 1)], [conflict(3, 2)], [orphan(9)]);
+check(
+  "flags keep their order, new ones append",
+  JSON.stringify(f.map((x) => x.wpId)) === JSON.stringify([2, 3, 9])
+);
+check("only the re-reported entry changes", f[0].theirs.bpm === 1 && f[1].theirs.bpm === 2);
 
 console.log(`\n=== ${pass} passed, ${fail} failed ===`);
 process.exit(fail ? 1 : 0);

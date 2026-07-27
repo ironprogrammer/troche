@@ -16,8 +16,9 @@ const check = (label, cond) => {
 // ---- fake server ----
 
 // Mirrors class-store.php: songs live keyed by post id, tokens are derived from
-// stored content (so an identical re-save doesn't move one), and wpId/wpToken
-// are stripped on the way in and decorated on the way out.
+// stored content (so an identical re-save doesn't move one), wpId/wpToken are
+// stripped on the way in and decorated on the way out, and a PUT carrying
+// X-Troche-Expect-Token is refused with 409 if the song has moved since.
 function makeServer(initial = {}) {
   const posts = new Map(Object.entries(initial).map(([k, v]) => [Number(k), v]));
   let nextId = 200;
@@ -27,6 +28,12 @@ function makeServer(initial = {}) {
   const server = {
     posts,
     calls: [],
+    // Expected-token header per PUT, in call order, so a test can assert the
+    // client offered one at all — a silently omitted header would downgrade
+    // every write back to unconditional without failing anything else.
+    expectations: [],
+    down: false, // network failure
+    auth: true,
     // Direct mutation, standing in for "the other laptop saved".
     edit(wpId, patch) {
       posts.set(wpId, { ...posts.get(wpId), ...patch });
@@ -51,6 +58,10 @@ function makeServer(initial = {}) {
     server.calls.push(method + " " + route);
     const body = opts.body ? JSON.parse(opts.body) : null;
     const ok = (status, data) => ({ ok: true, status, json: async () => data });
+    const err = (status) => ({ ok: false, status, json: async () => ({}) });
+
+    if (server.down) throw new TypeError("network error");
+    if (!server.auth) return err(403);
 
     if (route === "/library") {
       return ok(200, {
@@ -70,11 +81,14 @@ function makeServer(initial = {}) {
     const match = route.match(/^\/songs\/(\d+)$/);
     if (match) {
       const wpId = Number(match[1]);
-      if (!posts.has(wpId)) return { ok: false, status: 404, json: async () => ({}) };
+      if (!posts.has(wpId)) return err(404);
       if (method === "DELETE") {
         posts.delete(wpId);
         return ok(200, { deleted: true, wpId });
       }
+      const expect = (opts.headers || {})["X-Troche-Expect-Token"] ?? null;
+      server.expectations.push(expect);
+      if (expect !== null && expect !== token(posts.get(wpId))) return err(409);
       posts.set(wpId, strip(body));
       return ok(200, server.decorate(wpId));
     }
@@ -255,6 +269,92 @@ const names = (lib) => lib.songs.map((s) => s.name);
     "sync before the handle is adopted doesn't duplicate the song",
     result === null || result.library.songs.length === 2
   );
+}
+
+// ---- 10. a song rewritten between our sync and our write is refused ----
+// The sync-before-save narrows this window; the conditional PUT closes it.
+{
+  const server = makeServer({ 1: song("a", "Alpha"), 2: song("b", "Beta") });
+  const storage = await freshStorage();
+  const lib = await storage.loadLibrary();
+
+  const local = { ...lib, songs: [lib.songs[0], { ...lib.songs[1], bpm: 90 }] };
+  server.edit(2, { bpm: 155 }); // the other laptop, after our last sync
+
+  const res = await storage.saveLibrary(local);
+  check("a write onto a moved song is refused", res.ok === false && res.diverged === true);
+  check("refused write isn't reported as offline", !res.offline);
+  check("the other laptop's copy is intact", server.posts.get(2).bpm === 155);
+  check("the PUT carried an expected token", server.expectations.every((t) => !!t));
+
+  // ...and the follow-up sync turns it into a flag the user can act on.
+  const result = await storage.syncUpstream(local);
+  check("the refused write becomes a conflict", result.conflicts.length === 1);
+  check("conflict names the song", result.conflicts[0].name === "Beta");
+}
+
+// ---- 11. a song trashed between our sync and our write reports diverged ----
+// Used to surface as "Offline — changes kept locally", which it isn't.
+{
+  const server = makeServer({ 1: song("a", "Alpha"), 2: song("b", "Beta") });
+  const storage = await freshStorage();
+  const lib = await storage.loadLibrary();
+
+  const local = { ...lib, songs: [lib.songs[0], { ...lib.songs[1], bpm: 90 }] };
+  server.trash(2);
+
+  const res = await storage.saveLibrary(local);
+  check("a write onto a trashed song reports diverged", res.diverged === true);
+  check("a trashed song isn't reported as offline", !res.offline);
+
+  const result = await storage.syncUpstream(local);
+  check("the failed write becomes an orphan", result.orphans.length === 1);
+}
+
+// ---- 12. an unresolved conflict re-reports with the newer copy ----
+// "Use theirs" has to mean their copy as it stands now; adopting the one we
+// first saw would push it straight back over their newer one.
+{
+  const server = makeServer({ 1: song("a", "Alpha"), 2: song("b", "Beta") });
+  const storage = await freshStorage();
+  const lib = await storage.loadLibrary();
+
+  server.edit(2, { bpm: 155 });
+  const local = { ...lib, songs: [lib.songs[0], { ...lib.songs[1], bpm: 90 }] };
+  const first = await storage.syncUpstream(local);
+  check("first sync flags the conflict", first.conflicts[0].theirs.bpm === 155);
+
+  server.edit(2, { bpm: 175 }); // they edit again while we sit on the notice
+  const second = await storage.syncUpstream(first.library);
+  check("a re-edit re-reports the conflict", second.conflicts.length === 1);
+  check("the re-report carries their current copy", second.conflicts[0].theirs.bpm === 175);
+
+  // Nothing new upstream: the flag isn't re-reported, but the hold stands.
+  const third = await storage.syncUpstream(second.library);
+  check("a quiet sync doesn't re-report a held song", third === null);
+  await storage.saveLibrary(second.library);
+  check("the hold survives a quiet sync", server.posts.get(2).bpm === 175);
+}
+
+// ---- 13. probe failures don't take anything down with them ----
+{
+  const server = makeServer({ 1: song("a", "Alpha") });
+  const storage = await freshStorage();
+  const lib = await storage.loadLibrary();
+
+  server.down = true;
+  check("an offline probe reconciles nothing", (await storage.syncUpstream(lib)) === null);
+
+  server.down = false;
+  server.auth = false;
+  check("an expired session is reported, not swallowed", (await storage.syncUpstream(lib))?.authExpired === true);
+}
+
+// ---- 14. no server, nothing to sync ----
+{
+  globalThis.window = {}; // no trocheWP: standalone/localStorage mode
+  const storage = await import("../src/storage.js?case=local");
+  check("syncUpstream is a no-op outside WP mode", (await storage.syncUpstream({ songs: [] })) === null);
 }
 
 console.log(`\n=== ${pass} passed, ${fail} failed ===`);

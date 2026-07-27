@@ -8,6 +8,13 @@
  * - PUT    /songs/{id}      Update a song              (troche_edit required).
  * - DELETE /songs/{id}      Trash a song               (troche_edit required).
  *
+ * PUT honours an optional X-Troche-Expect-Token header carrying the version
+ * token the client last saw; the update is refused with 409 if the song has
+ * moved since. A custom header rather than If-Match on purpose: an If-Match a
+ * proxy or cache decides to evaluate itself would fail the save outright,
+ * whereas a stripped custom header just degrades to the unconditional write
+ * this endpoint has always done.
+ *
  * Auth is cookie + nonce (same-origin); there is no CORS surface. Reads gate on
  * being logged in; writes gate on the troche_edit capability.
  *
@@ -175,8 +182,11 @@ class Rest_Controller {
 			);
 		}
 
+		// Only meaningful on an update; a create has nothing to be stale against.
+		$expect = $wp_id ? $request->get_header( 'x_troche_expect_token' ) : null;
+
 		$song  = Store::sanitize_song( $body );
-		$saved = Store::save_song( $song, $wp_id, get_current_user_id() );
+		$saved = Store::save_song( $song, $wp_id, get_current_user_id(), $expect );
 
 		if ( is_wp_error( $saved ) ) {
 			return $saved;
