@@ -151,7 +151,7 @@ export default function App() {
   const {
     playing, togglePlay, stop,
     metronome, setMetronome,
-    flash, setFlash, flashElRef,
+    flash, setFlash, flashElRef, flashLayerRef,
     segments, totalBeats, secPerBeat,
     countInActive, masterTop,
     inCountIn, activePartId, partProgress,
@@ -579,9 +579,13 @@ export default function App() {
       {/* Print-only chart — hidden on screen, revealed inside @media print. */}
       <PrintChart song={activeSong} />
 
-      {/* Beat flash. Always mounted (transparent at rest) so the playback
-          engine can animate it the instant a beat lands. */}
-      <div ref={flashElRef} className="sa-flash" aria-hidden="true" />
+      {/* Beat flash. Always mounted so the playback engine can animate it the
+          instant a beat lands; the engine displays the wrapper only for the
+          length of each beat and drives the inner fill — see .sa-flash in
+          styles.js for why it's split that way. */}
+      <div ref={flashLayerRef} className="sa-flash" aria-hidden="true">
+        <div ref={flashElRef} className="sa-flash-fill" />
+      </div>
 
       <div ref={stickyRef} style={styles.stickyTop}>
         <Header

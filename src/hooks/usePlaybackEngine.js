@@ -29,7 +29,8 @@ export function usePlaybackEngine(activeSong) {
   // through React state: the beat times come off the same lookahead queue the
   // clicks do, and the fade runs on the Web Animations API so the compositor
   // owns it — neither the flash's start nor its decay waits on a render.
-  const flashElRef = useRef(null);
+  const flashElRef = useRef(null);   // the colored fill
+  const flashLayerRef = useRef(null); // the fixed wrapper, shown only mid-beat
   const flashQueueRef = useRef([]); // [{ t: audioCtx time, accent }] pending beats
 
   const secPerBeat = activeSong ? 60 / activeSong.bpm : 0.5;
@@ -118,27 +119,36 @@ export function usePlaybackEngine(activeSong) {
     src.start(when);
   };
 
-  // Downbeat: a hard, flat wash of the accent colour, gone in ~70ms — short
+  // Downbeat: a hard, flat wash of the accent color, gone in ~70ms — short
   // enough to read as a strobe hit rather than a tint sitting over the chart.
   // Off-beats: a dim edge-weighted wash that never obscures anything.
   const fireFlash = (accent) => {
     const el = flashElRef.current;
-    if (!el) return;
+    const layer = flashLayerRef.current;
+    if (!el || !layer) return;
     el.classList.toggle("downbeat", accent);
+    // The wrapper only exists in the render tree for the length of the beat —
+    // see .sa-flash in styles.js. Display has to be restored before animate(),
+    // which won't run against a display:none element.
+    layer.classList.add("live");
     // Keep the flash inside its own beat so fast tempos don't smear into one
     // another, and cancel any in-flight fade so a new beat starts clean.
     const dur = Math.min(accent ? 70 : 110, secPerBeat * 1000 * 0.55);
     for (const a of el.getAnimations()) a.cancel();
-    el.animate(
+    const anim = el.animate(
       [{ opacity: accent ? 0.92 : 0.16 }, { opacity: 0 }],
       { duration: dur, easing: accent ? "cubic-bezier(.2,0,.6,1)" : "ease-out" }
     );
+    // cancel() doesn't fire onfinish, so a beat that supersedes this one hands
+    // the hide-again duty to its own animation rather than dropping it.
+    anim.onfinish = () => layer.classList.remove("live");
   };
 
   const clearFlash = () => {
     flashQueueRef.current = [];
     const el = flashElRef.current;
     if (el) for (const a of el.getAnimations()) a.cancel();
+    flashLayerRef.current?.classList.remove("live");
   };
 
   const stopScheduler = () => {
@@ -312,6 +322,7 @@ export function usePlaybackEngine(activeSong) {
     flash,
     setFlash,
     flashElRef,
+    flashLayerRef,
     togglePlay,
     stop,
     // derived song shape

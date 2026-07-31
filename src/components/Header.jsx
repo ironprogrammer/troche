@@ -131,6 +131,7 @@ export function Header({
         <input
           className="sa-input name"
           value={activeSong.name}
+          disabled={playing}
           onChange={(e) => setField("name", e.target.value)}
         />
       </MetaField>
@@ -163,6 +164,7 @@ export function Header({
         <select
           className="sa-input keysel"
           value={activeSong.musicalKey || ""}
+          disabled={playing}
           onChange={(e) => setField("musicalKey", e.target.value)}
         >
           <option value="">—</option>
