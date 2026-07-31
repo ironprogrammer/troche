@@ -261,17 +261,13 @@ select.sa-input { padding-right: 28px; appearance: none; -webkit-appearance: non
    Downbeat: flat fill at near-full opacity — it can hide the sheet because
    the engine keeps it to ~70ms.
 
-   Two things here are about Safari 26, which tints the status bar and toolbar
-   by sampling fixed/sticky elements near the viewport edges rather than from
-   theme-color. A full-viewport fixed overlay is the candidate at both edges,
-   so an accent background on it turns the browser chrome into orange bars for
-   the whole of playback, and a transparent one turns them white. Hence:
-   .live — the wrapper is display:none between beats, so most of the time it
-   isn't in the render tree to be sampled at all (opacity 0 is not enough,
-   Safari still reads the background off a hidden fixed element); and the
-   color sits on an absolutely positioned child, so even mid-beat the fixed
-   wrapper itself has nothing to sample and the chrome falls back to the paper
-   background set on html/body in index.html. */
+   Safari 26 tints the status bar and toolbar by sampling fixed/sticky elements
+   near the viewport edges rather than from theme-color, and a full-viewport
+   fixed overlay is the candidate at both edges. So the wrapper is display:none
+   between beats (opacity 0 is not enough — Safari still reads the background
+   off a hidden fixed element), and the color sits on an absolutely positioned
+   child, leaving the fixed wrapper nothing to sample even mid-beat. The chrome
+   then falls back to the paper background set on html/body in index.html. */
 .sa-flash {
   display: none;
   position: fixed; inset: 0; z-index: 100;
@@ -434,6 +430,9 @@ select.sa-input { padding-right: 28px; appearance: none; -webkit-appearance: non
   opacity: 1; color: var(--ink); -webkit-text-fill-color: var(--ink);
 }
 .sa-cue:disabled:hover { border-bottom-color: transparent; }
+/* The prompt is noise on a field you can't type in — and the inherited
+   text-fill above would otherwise render it in full ink. */
+.sa-cue:disabled::placeholder { -webkit-text-fill-color: transparent; }
 .sa-block-sub {
   display: flex; align-items: center; gap: 10px;
   font-size: 12px; color: var(--ink-dim);
@@ -464,7 +463,8 @@ select.sa-input { padding-right: 28px; appearance: none; -webkit-appearance: non
   cursor: pointer; color: var(--ink-dim); transition: all .15s;
 }
 .sa-config:hover { border-color: var(--ink-dim); color: var(--ink); }
-/* The swatch keeps its color so the part is still identifiable while locked. */
+/* Half opacity rather than a grey-out: the swatch still carries enough color
+   at .5 to identify the part while it's locked. */
 .sa-config:disabled { opacity: .5; cursor: default; }
 .sa-config:disabled:hover { border-color: var(--line); color: var(--ink-dim); }
 .sa-config.open { border-color: var(--clr); color: var(--ink); background: var(--bg); }
@@ -632,12 +632,8 @@ input[type=number]::-webkit-inner-spin-button { opacity: .4; }
    panning around a magnified chart mid-song. 16px is a hard threshold, not a
    design choice, so every text field gets it on touch; the desktop sizes are
    untouched. Selects are exempt (they open a picker, not a keyboard) and
-   .sa-partname is already 16px+ at every width.
-
-   This block sits last on purpose. Each selector is element-qualified so it
-   outranks the class rules that set the smaller sizes — a plain .sa-cue would
-   only tie with the 12px rule further up, and .sa-input.sample's two classes
-   outrank a bare input.sa-input wherever it sits. */
+   .sa-partname is already 16px+ at every width. Each selector is
+   element-qualified to outrank the class rule that sets its smaller size. */
 @media (pointer: coarse) {
   input.sa-input,
   input.sa-input.sample,
