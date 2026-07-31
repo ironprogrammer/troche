@@ -4,7 +4,7 @@ Tags: music, band, arrangement, songwriting
 Requires at least: 6.9
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 1.1.0
+Stable tag: 1.1.1
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -66,6 +66,11 @@ Deleted songs go to the trash, and every save is kept as a revision, so you can
 restore either from the dashboard.
 
 == Changelog ==
+
+= 1.1.1 =
+* Lock the chart while a song is playing: the song and part fields can no longer be edited mid-song, and open part settings collapse out of the way.
+* Fix the screen flash tinting Safari's status bar and toolbar orange for the length of playback on iOS.
+* Fix iOS zooming in on the chart when a text field is tapped, and never zooming back out.
 
 = 1.1.0 =
 * Add a screen flash: an optional full-screen flash on every beat, hard on the downbeat and dim on the rest, locked to the same clock as the click.

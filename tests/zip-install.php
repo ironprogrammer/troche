@@ -36,7 +36,7 @@ check( 'no source (src/) leaked into the package', ! file_exists( $dir . '/src' 
 
 // It activated cleanly.
 check( 'plugin active', is_plugin_active( 'troche/troche.php' ) );
-check( 'version is 1.1.0', defined( 'TROCHE_VERSION' ) && '1.1.0' === TROCHE_VERSION );
+check( 'version is 1.1.1', defined( 'TROCHE_VERSION' ) && '1.1.1' === TROCHE_VERSION );
 check( 'song post type registered', post_type_exists( 'troche_song' ) );
 check( 'activation granted admin troche_edit', user_can( 1, 'troche_edit' ) );
 
