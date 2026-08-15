@@ -125,8 +125,6 @@ class Admin {
 			}
 		}
 
-		// Registered here on admin_init; rendered by settings_errors() below in
-		// the same request (no redirect, so no transient handoff needed).
 		add_settings_error( 'troche', 'troche_saved', __( 'Settings saved.', 'troche' ), 'success' );
 	}
 
@@ -152,7 +150,6 @@ class Admin {
 		?>
 		<div class="wrap">
 			<h1><?php esc_html_e( 'Troche', 'troche' ); ?></h1>
-			<?php settings_errors( 'troche' ); ?>
 
 			<form method="post" action="">
 				<?php wp_nonce_field( 'troche_save', 'troche_nonce' ); ?>
