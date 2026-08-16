@@ -737,9 +737,16 @@ input[type=number]::-webkit-inner-spin-button { opacity: .4; }
    untouched. Selects are exempt (they open a picker, not a keyboard) and
    .sa-partname is already 16px+ at every width. Each selector is
    element-qualified to outrank the class rule that sets its smaller size. */
+/* iOS zooms the page whenever you focus a field under 16px, and won't zoom
+   back out — so every editable field has to clear that bar on touch. Each lane
+   sets its own size through a two-class selector, which outranks a bare
+   input.sa-laneinput no matter where it sits in the sheet; the guard has to
+   match that specificity or it silently loses and the zoom comes back. */
 @media (pointer: coarse) {
   input.sa-input,
   input.sa-input.sample,
-  input.sa-laneinput { font-size: 16px; }
+  input.sa-laneinput.chords,
+  input.sa-laneinput.lyric,
+  input.sa-laneinput.direction { font-size: 16px; }
 }
 `;
