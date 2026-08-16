@@ -642,6 +642,14 @@ input[type=number]::-webkit-inner-spin-button { opacity: .4; }
   .sa-config { padding: 0 8px; }
   .sa-status .cell b { font-size: 24px; }
   .sa-status .beatgroup { gap: 12px; }
+  /* Make room for the bar/beat readout on the transport row rather than
+     letting it wrap to one of its own. Two things give: the Stop button drops
+     to an icon-only square (only while playing — idle still reads "Play"),
+     and the COUNT-IN chip goes, since .countin already turns the numerals red
+     and that's the same signal in none of the width. */
+  .sa-play.stop { min-width: 42px; padding: 11px 0; }
+  .sa-play.stop .sa-play-label { display: none; }
+  .sa-status .tag { display: none; }
   .sa-input.name { width: 100%; min-width: 160px; }
   /* icon-only header buttons on narrow screens — text takes too much room
      and we need Import/Export/Share/Save to all fit on one line */

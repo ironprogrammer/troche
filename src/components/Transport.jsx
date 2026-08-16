@@ -15,7 +15,7 @@ export function Transport({
         disabled={totalBeats <= 0}
       >
         {playing ? <Square size={16} fill="currentColor" /> : <Play size={16} fill="currentColor" />}
-        {playing ? "Stop" : "Play"}
+        <span className="sa-play-label">{playing ? "Stop" : "Play"}</span>
       </button>
 
       <button
