@@ -4,7 +4,7 @@ Tags: music, band, arrangement, songwriting
 Requires at least: 6.9
 Tested up to: 6.9
 Requires PHP: 7.4
-Stable tag: 1.1.1
+Stable tag: 1.2.0
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -66,6 +66,14 @@ Deleted songs go to the trash, and every save is kept as a revision, so you can
 restore either from the dashboard.
 
 == Changelog ==
+
+= 1.2.0 =
+* Split each part's cue into three lanes — chords, lyric, and performance direction — each in its own typography, and each one hideable from the transport bar.
+* Add chord entry helpers (♭ ♯ Δ ° | % /) that insert at the cursor, so the symbols don't need a special keyboard.
+* Print the three lanes as stacked lines on the printed chart, dropping any a part leaves empty.
+* Cue lines now wrap instead of running off the edge, and use the full width of a part on a phone.
+* An existing part's cue becomes its lyric lane; splitting chords and direction out of it is a manual pass.
+* Fix tapping a cue field zooming the page on iOS with no way to zoom back out.
 
 = 1.1.1 =
 * Lock the chart while a song is playing: the song and part fields can no longer be edited mid-song, and open part settings collapse out of the way.
