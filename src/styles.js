@@ -468,13 +468,22 @@ select.sa-input { padding-right: 28px; appearance: none; -webkit-appearance: non
   border-bottom: 1px dashed transparent;
   padding: 2px 0; color: var(--ink);
   transition: border-color .15s;
+  --ph: transparent;
 }
 .sa-laneinput:hover { border-bottom-color: var(--line); }
-.sa-laneinput:focus { outline: none; border-bottom-color: var(--clr); }
-.sa-laneinput::placeholder { color: var(--ink-dim); opacity: .65; font-style: italic; }
-/* The prompt is noise on a field you can't type in — and the text-fill above
-   would otherwise render it in full ink. */
-.sa-laneinput:disabled::placeholder { -webkit-text-fill-color: transparent; }
+/* Prompts only on the block you're working in. Three of them on every part is
+   a wall of grey down the whole chart at rest, and the gutter icon already
+   says which lane is which — the placeholder is only useful once you're
+   actually in the field. Custom properties inherit into ::placeholder, so the
+   reveal is a single declaration. */
+.sa-laneinput::placeholder {
+  color: var(--ph); opacity: .65; font-style: italic;
+  transition: color .15s;
+}
+.sa-laneinput:focus { outline: none; border-bottom-color: var(--clr); --ph: var(--ink-dim); }
+@media (hover: hover) {
+  .sa-block-inner:hover .sa-laneinput { --ph: var(--ink-dim); }
+}
 
 .sa-laneinput.chords {
   font-family: 'TrocheAccidental', 'Spline Sans Mono', monospace;
