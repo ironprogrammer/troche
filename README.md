@@ -50,6 +50,7 @@ Named in a nod toward Lozenger, my band's informal name.
 ## Develop locally
 
 ```bash
+nvm use
 npm install
 npm run dev
 ```
