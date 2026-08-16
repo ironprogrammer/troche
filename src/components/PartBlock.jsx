@@ -180,14 +180,26 @@ export const PartBlock = React.forwardRef(function PartBlock(
                 <React.Fragment key={key}>
                   <div className="sa-lane">
                     <span className="sa-lane-mark" aria-hidden="true"><Icon size={12} /></span>
-                    <input
+                    {/* A textarea, not an input, purely so a long line wraps
+                        instead of clipping at the right edge — a progression
+                        you can't see the end of is unusable on a phone.
+                        Enter is swallowed so a lane stays one logical line and
+                        nothing downstream has to handle newlines. */}
+                    <textarea
                       ref={isChords ? chordsRef : undefined}
                       className={`sa-laneinput ${key}`}
+                      rows={1}
                       placeholder={placeholder}
                       aria-label={label}
                       value={value}
                       disabled={playing}
                       onChange={(e) => onUpdate({ [key]: e.target.value })}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          e.currentTarget.blur();
+                        }
+                      }}
                       onFocus={isChords ? () => setChordsFocused(true) : undefined}
                       onBlur={isChords ? () => setChordsFocused(false) : undefined}
                     />

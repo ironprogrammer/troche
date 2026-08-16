@@ -487,6 +487,12 @@ select.sa-input { padding-right: 28px; appearance: none; -webkit-appearance: non
   padding: 2px 0; color: var(--ink);
   transition: border-color .15s;
   --ph: transparent;
+  /* Wraps rather than clipping. field-sizing grows the box to fit the text —
+     where it isn't supported the rows={1} textarea just renders a single
+     clipped line, which is the behavior this replaced. */
+  field-sizing: content;
+  resize: none; overflow: hidden;
+  display: block; font: inherit; line-height: 1.35;
 }
 .sa-laneinput:hover { border-bottom-color: var(--line); }
 /* Prompts only on the block you're working in. Three of them on every part is
@@ -766,8 +772,8 @@ input[type=number]::-webkit-inner-spin-button { opacity: .4; }
 @media (pointer: coarse) {
   input.sa-input,
   input.sa-input.sample,
-  input.sa-laneinput.chords,
-  input.sa-laneinput.lyric,
-  input.sa-laneinput.direction { font-size: 16px; }
+  textarea.sa-laneinput.chords,
+  textarea.sa-laneinput.lyric,
+  textarea.sa-laneinput.direction { font-size: 16px; }
 }
 `;
