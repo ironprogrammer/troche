@@ -1,7 +1,11 @@
-import { Play, Square, Volume2, VolumeX, Zap, ZapOff } from "lucide-react";
+import { Play, Square, Volume2, VolumeX, Zap, ZapOff, Music, Mic, Italic } from "lucide-react";
+import { CUE_LANES } from "../constants.js";
+
+const LANE_ICON = { chords: Music, lyric: Mic, direction: Italic };
 
 export function Transport({
   playing, togglePlay, metronome, setMetronome, flash, setFlash,
+  lanes, toggleLane,
   inCountIn, activePartId, curMeasure, curBeat, ciBeat,
   totalBeats, lengthLabel, barsLabel,
 }) {
@@ -34,6 +38,29 @@ export function Transport({
       >
         {flash ? <Zap size={16} /> : <ZapOff size={16} />}
       </button>
+
+      {/* Cue lane visibility. Same square as the click and flash toggles —
+          these answer the same question those do: how do I want to read the
+          chart while I play? Stays live during playback, which is exactly
+          when you'd want to drop a lane. */}
+      <div className="sa-lanetoggles" role="group" aria-label="Cue lanes">
+        {CUE_LANES.map(({ key, label }) => {
+          const Icon = LANE_ICON[key];
+          const on = lanes[key];
+          return (
+            <button
+              key={key}
+              className={`sa-metro ${on ? "on" : ""}`}
+              onClick={() => toggleLane(key)}
+              title={`${label} lane ${on ? "on — tap to hide" : "off — tap to show"}`}
+              aria-label={`Show ${label.toLowerCase()} lane`}
+              aria-pressed={on}
+            >
+              <Icon size={16} />
+            </button>
+          );
+        })}
+      </div>
 
       <div className="sa-statuswrap">
         {playing ? (

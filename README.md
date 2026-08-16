@@ -22,8 +22,14 @@ Named in a nod toward Lozenger, my band's informal name.
   it can't drift. Both playback toggles (click, flash) persist per device.
 - **Multiple songs** in a single library, with a song switcher and per-song
   metadata (BPM, time, count-in bars).
-- **Per-part cues, colors, and sample links** — paste an mp3/wav URL on a
-  part as a reference (opened in a new tab; not played by the app).
+- **Three cue lanes per part** — chords, lyric cue, and performance direction,
+  kept apart the way a paper chart already separates them. Each renders in its
+  own voice (chords in mono, lyric plain, direction italic) and can be hidden
+  from the transport bar; that choice persists per device, not per song. Empty
+  lanes collapse during playback so a sparse part stays compact. The chords
+  field offers caret-insert buttons for `♭ ♯ Δ ° | % /`.
+- **Per-part colors and sample links** — paste an mp3/wav URL on a part as a
+  reference (opened in a new tab; not played by the app).
 - **Autosave to `localStorage`**, with a Save button that flushes on demand.
 - **Import / export** as JSON. All exports use one versioned envelope:
   `{ format: "troche", version: 1, songs: [...] }`. Single-song export is

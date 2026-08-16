@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Music, Plus, RotateCcw } from "lucide-react";
-import { PALETTE } from "./constants.js";
+import { PALETTE, CUE_LANES } from "./constants.js";
 import { uid, normalizeLibrary } from "./utils.js";
 import { defaultLibrary, defaultSong } from "./defaults.js";
 import {
   loadLibrary,
   saveLibrary,
   clearBuffer,
+  loadPrefs,
+  savePrefs,
   wpMode,
   canEdit,
   loginUrl,
@@ -70,6 +72,21 @@ export default function App() {
 
   // brief confirmation that a share link was copied
   const [shareFlash, setShareFlash] = useState(false);
+
+  // Which cue lanes are visible. A per-user, per-device reading preference —
+  // it rides in prefs alongside the metronome, never in the song.
+  const [lanes, setLanes] = useState(() => {
+    const prefs = loadPrefs();
+    return Object.fromEntries(CUE_LANES.map(({ key, pref }) => [key, prefs[pref]]));
+  });
+
+  const toggleLane = useCallback((key) => {
+    setLanes((prev) => ({ ...prev, [key]: !prev[key] }));
+  }, []);
+
+  useEffect(() => {
+    savePrefs(Object.fromEntries(CUE_LANES.map(({ key, pref }) => [pref, lanes[key]])));
+  }, [lanes]);
 
   useEffect(() => {
     // Consume the shared payload (if any) before loading from storage. The
@@ -190,7 +207,9 @@ export default function App() {
           measures: 4,
           color: PALETTE[s.parts.length % PALETTE.length],
           sample: "",
-          cue: "",
+          chords: "",
+          lyric: "",
+          direction: "",
         },
       ],
     }));
@@ -622,6 +641,8 @@ export default function App() {
           setMetronome={setMetronome}
           flash={flash}
           setFlash={setFlash}
+          lanes={lanes}
+          toggleLane={toggleLane}
           inCountIn={inCountIn}
           activePartId={activePartId}
           curMeasure={curMeasure}
@@ -644,6 +665,7 @@ export default function App() {
             active={part.id === activePartId}
             progress={partProgress[part.id] || 0}
             playing={playing}
+            lanes={lanes}
             autoFocusName={part.id === focusPartId}
             onAutoFocused={() => setFocusPartId(null)}
             onUpdate={(patch) => updatePart(part.id, patch)}

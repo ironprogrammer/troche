@@ -49,5 +49,53 @@ check("no double-suffix", !r2.library.songs.some((s) => /\(\d+\) \(\d+\)/.test(s
 const r3 = normalizeLibrary({ activeId: "a", songs: [{ id: "a", name: "One" }, { id: "b", name: "Two" }] });
 check("clean library unchanged", r3.changed === false);
 
+// ---- cue -> three lanes ----
+// An old single-string `cue` becomes `lyric`; chords and direction are left
+// for the user to split out by hand.
+const m = normalizeLibrary({
+  activeId: "a",
+  songs: [
+    {
+      id: "a",
+      name: "Old Song",
+      parts: [
+        { id: "p1", name: "Intro", cue: "the iconic synth riff" },
+        { id: "p2", name: "Verse", cue: "" },
+      ],
+    },
+  ],
+});
+const mParts = m.library.songs[0].parts;
+check("migration flagged as changed", m.changed === true);
+check("cue key is gone", mParts.every((p) => !("cue" in p)));
+check("cue text landed in lyric", mParts[0].lyric === "the iconic synth riff");
+check("empty cue becomes empty lyric", mParts[1].lyric === "");
+check("other part fields survive", mParts[0].name === "Intro" && mParts[0].id === "p1");
+
+// Idempotent: a migrated library is not rewritten (and so never flags a save).
+check("migration stable on re-run", normalizeLibrary(m.library).changed === false);
+
+// A part already on the new shape keeps all three lanes untouched.
+const kept = normalizeLibrary({
+  activeId: "a",
+  songs: [
+    {
+      id: "a",
+      name: "New Song",
+      parts: [{ id: "p1", name: "Chorus", chords: "| A♭ |", lyric: "hook", direction: "build" }],
+    },
+  ],
+});
+const keptPart = kept.library.songs[0].parts[0];
+check("new-shape library unchanged", kept.changed === false);
+check(
+  "all three lanes preserved",
+  keptPart.chords === "| A♭ |" && keptPart.lyric === "hook" && keptPart.direction === "build"
+);
+
+// Songs without a parts array (bare fixtures, partial imports) must not gain one.
+const bare = normalizeLibrary({ activeId: "a", songs: [{ id: "a", name: "Bare" }] });
+check("no phantom parts key added", !("parts" in bare.library.songs[0]));
+
 console.log(`\n=== ${pass} passed, ${fail} failed ===`);
 process.exit(fail ? 1 : 0);
