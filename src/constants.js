@@ -1,3 +1,5 @@
+import { Music, Mic, Italic } from "lucide-react";
+
 export const STORAGE_KEY = "troche:library:v1";
 
 // Playback toggles (click on/off, screen flash on/off) and cue lane
@@ -8,11 +10,12 @@ export const PREFS_KEY = "troche:prefs:v1";
 
 // A part's cue, split into the three layers a chart already separates. Order
 // here is the order they render in the block and on the printed chart.
-// `pref` is the loadPrefs()/savePrefs() key holding this lane's visibility.
+// `pref` is the loadPrefs()/savePrefs() key holding this lane's visibility;
+// `icon` marks the lane in the block gutter and on its transport toggle.
 export const CUE_LANES = [
-  { key: "chords",    label: "Chords",    pref: "laneChords",    placeholder: "chords…" },
-  { key: "lyric",     label: "Lyric",     pref: "laneLyric",     placeholder: "lyric cue…" },
-  { key: "direction", label: "Direction", pref: "laneDirection", placeholder: "feel / direction…" },
+  { key: "chords",    label: "Chords",    pref: "laneChords",    icon: Music,  placeholder: "chords…" },
+  { key: "lyric",     label: "Lyric",     pref: "laneLyric",     icon: Mic,    placeholder: "lyric cue…" },
+  { key: "direction", label: "Direction", pref: "laneDirection", icon: Italic, placeholder: "feel / direction…" },
 ];
 
 // Symbols that are a nuisance to type on a phone, inserted at the caret.

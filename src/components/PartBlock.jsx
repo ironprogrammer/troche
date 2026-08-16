@@ -1,10 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
-import { GripVertical, Link2, Settings2, Trash2, Copy, X, Music, Mic, Italic } from "lucide-react";
+import { GripVertical, Link2, Settings2, Trash2, Copy, X } from "lucide-react";
 import { PALETTE, TIME_SIGS, CHORD_HELPERS, CUE_LANES } from "../constants.js";
 import { partSig, sigKey } from "../utils.js";
 import { NumberInput } from "./NumberInput.jsx";
-
-const LANE_ICON = { chords: Music, lyric: Mic, direction: Italic };
 
 export const PartBlock = React.forwardRef(function PartBlock(
   { part, index, song, active, progress, playing, lanes, autoFocusName, onAutoFocused, onUpdate, onRemove, onDuplicate, onMove },
@@ -173,11 +171,10 @@ export const PartBlock = React.forwardRef(function PartBlock(
               header toggle, and an empty one collapses during playback so a
               sparse part stays compact on stage. */}
           <div className="sa-lanes">
-            {CUE_LANES.map(({ key, label, placeholder }) => {
+            {CUE_LANES.map(({ key, label, icon: Icon, placeholder }) => {
               if (!lanes[key]) return null;
               const value = part[key] || "";
               if (playing && !value) return null;
-              const Icon = LANE_ICON[key];
               const isChords = key === "chords";
               return (
                 <React.Fragment key={key}>

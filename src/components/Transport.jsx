@@ -1,7 +1,5 @@
-import { Play, Square, Volume2, VolumeX, Zap, ZapOff, Music, Mic, Italic } from "lucide-react";
+import { Play, Square, Volume2, VolumeX, Zap, ZapOff } from "lucide-react";
 import { CUE_LANES } from "../constants.js";
-
-const LANE_ICON = { chords: Music, lyric: Mic, direction: Italic };
 
 export function Transport({
   playing, togglePlay, metronome, setMetronome, flash, setFlash,
@@ -44,8 +42,7 @@ export function Transport({
           chart while I play? Stays live during playback, which is exactly
           when you'd want to drop a lane. */}
       <div className="sa-lanetoggles" role="group" aria-label="Cue lanes">
-        {CUE_LANES.map(({ key, label }) => {
-          const Icon = LANE_ICON[key];
+        {CUE_LANES.map(({ key, label, icon: Icon }) => {
           const on = lanes[key];
           return (
             <button
