@@ -650,6 +650,13 @@ input[type=number]::-webkit-inner-spin-button { opacity: .4; }
   .sa-play.stop { min-width: 42px; padding: 11px 0; }
   .sa-play.stop .sa-play-label { display: none; }
   .sa-status .tag { display: none; }
+  /* Ten 24px chips need 294px and the panel gives 276, so the tenth wrapped
+     alone. Two rows of five instead: no widow at any width, and the chips grow
+     into proper tap targets rather than shrinking to squeeze onto one line. */
+  /* flex:1 because .sa-editor-row sizes its items to content, and a grid of
+     1fr columns holding width:100% children has no intrinsic width to report. */
+  .sa-palette { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; flex: 1; min-width: 0; }
+  .sa-palettebtn { width: 100%; height: 38px; }
   .sa-input.name { width: 100%; min-width: 160px; }
   /* icon-only header buttons on narrow screens — text takes too much room
      and we need Import/Export/Share/Save to all fit on one line */
