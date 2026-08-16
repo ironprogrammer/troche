@@ -97,5 +97,19 @@ check(
 const bare = normalizeLibrary({ activeId: "a", songs: [{ id: "a", name: "Bare" }] });
 check("no phantom parts key added", !("parts" in bare.library.songs[0]));
 
+// A hole in the parts array (corrupt import) must not take the whole load down:
+// normalizeLibrary runs inside loadLibrary().then(), so a throw here would hang
+// the app on its loading state with nothing on screen.
+let holed = null;
+try {
+  holed = normalizeLibrary({
+    activeId: "a",
+    songs: [{ id: "a", name: "Holed", parts: [{ id: "p1", cue: "keep me" }, null] }],
+  });
+} catch {
+  // leave holed null — the check below reports it
+}
+check("null part survives migration", holed?.library.songs[0].parts[0].lyric === "keep me");
+
 console.log(`\n=== ${pass} passed, ${fail} failed ===`);
 process.exit(fail ? 1 : 0);

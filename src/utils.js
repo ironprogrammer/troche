@@ -13,7 +13,7 @@ export const uid = () => Math.random().toString(36).slice(2, 10);
 // `lyric`, which is what nearly all of them actually held. Splitting the rest
 // out is a manual editorial job, not something to guess at.
 function migratePart(part) {
-  if (!("cue" in part)) return part;
+  if (!part || !("cue" in part)) return part;
   const { cue, ...rest } = part;
   return { ...rest, lyric: cue || rest.lyric || "" };
 }
