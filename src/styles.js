@@ -85,6 +85,9 @@ export const css = `
   --accent: #d8483b;
   /* Grey, but pulled toward ink so a direction doesn't read as disabled. */
   --direction-ink: #545049;
+  /* Height of a part's name row. The grip and the tools flank it and center
+     against it, so it's shared rather than restated in three places. */
+  --namerow-h: 26px;
 }
 
 * { box-sizing: border-box; }
@@ -417,9 +420,14 @@ select.sa-input { padding-right: 28px; appearance: none; -webkit-appearance: non
   display: flex; align-items: flex-start; gap: 12px;
   padding: 12px 14px;
 }
+/* Both flanking columns center themselves against the name row rather than
+   the whole (variable-height) block. Sizing them to --namerow-h says that
+   once, instead of hand-tuned top padding that has to be re-tuned every time
+   the name's type changes. */
 .sa-grip {
-  color: var(--ink-dim); display: flex; opacity: .5;
-  cursor: grab; touch-action: none; padding: 12px 4px 4px; margin: -4px;
+  color: var(--ink-dim); display: flex; align-items: center; opacity: .5;
+  height: var(--namerow-h);
+  cursor: grab; touch-action: none; padding: 0 4px; margin: 0 -4px;
 }
 .sa-grip:hover { opacity: 1; }
 .sa-grip:active { cursor: grabbing; }
@@ -436,8 +444,12 @@ select.sa-input { padding-right: 28px; appearance: none; -webkit-appearance: non
 .sa-measures:focus { outline: none; border-color: var(--clr); }
 
 .sa-block-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+/* Explicit line-height, not normal, so the name row is exactly --namerow-h
+   at both the desktop and mobile font sizes, and the grip and tools stay put
+   across the breakpoint. */
 .sa-partname {
   font-family: 'Outfit', sans-serif; font-size: 18px; font-weight: 600;
+  line-height: 22px;
   border: none; background: transparent; color: var(--ink);
   width: 100%; padding: 2px 0; letter-spacing: -.01em;
 }
@@ -455,7 +467,7 @@ select.sa-input { padding-right: 28px; appearance: none; -webkit-appearance: non
 
 /* The three cue lanes. No labels: typography and the gutter icon carry the
    identity, and labels would cost width the phone layout hasn't got. */
-.sa-namerow { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.sa-namerow { display: flex; align-items: center; gap: 8px; min-width: 0; min-height: var(--namerow-h); }
 .sa-lanes { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .sa-lane {
   display: grid; grid-template-columns: 15px minmax(0, 1fr);
@@ -526,7 +538,7 @@ select.sa-input { padding-right: 28px; appearance: none; -webkit-appearance: non
 
 .sa-lanetoggles { display: inline-flex; align-items: center; gap: 8px; }
 
-.sa-block-tools { display: flex; align-items: center; gap: 6px; padding-top: 9px; }
+.sa-block-tools { display: flex; align-items: center; gap: 6px; height: var(--namerow-h); }
 .sa-config {
   display: inline-flex; align-items: center; gap: 7px;
   border: 1px solid var(--line); background: var(--card);
