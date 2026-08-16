@@ -8,10 +8,21 @@ export const partSig = (part, song) => ({
 
 export const uid = () => Math.random().toString(36).slice(2, 10);
 
+// A part's cue used to be one free-text string. It's now three lanes —
+// `chords`, `lyric`, `direction` — so an old `cue` moves wholesale into
+// `lyric`, which is what nearly all of them actually held. Splitting the rest
+// out is a manual editorial job, not something to guess at.
+function migratePart(part) {
+  if (!part || !("cue" in part)) return part;
+  const { cue, ...rest } = part;
+  return { ...rest, lyric: cue || rest.lyric || "" };
+}
+
 // Repair a library's identities: every song gets a unique, non-empty `id`
 // (missing/duplicate ids are regenerated — invisible to the user), and exact
 // duplicate names get a macOS-style " (2)", " (3)" suffix (first occurrence
 // keeps the bare name). Stable: "Song (2)" won't grow to "Song (2) (2)".
+// Parts are migrated to the three cue lanes in the same pass.
 //
 // Meant for the discrete moments a duplicate can appear — load, import,
 // share-merge, new song — NOT on every keystroke. Returns the normalized
@@ -50,7 +61,16 @@ export function normalizeLibrary(library) {
     const name = uniqueName(s.name);
     if (name !== s.name) changed = true;
 
-    return id === s.id && name === s.name ? s : { ...s, id, name };
+    let parts = s.parts;
+    if (Array.isArray(parts) && parts.some((p) => p && "cue" in p)) {
+      parts = parts.map(migratePart);
+      changed = true;
+    }
+
+    if (id === s.id && name === s.name && parts === s.parts) return s;
+    const next = { ...s, id, name };
+    if (parts !== s.parts) next.parts = parts;
+    return next;
   });
 
   const activeId = idRemap[library.activeId] ?? library.activeId;

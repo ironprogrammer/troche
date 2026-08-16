@@ -68,7 +68,15 @@ function writeBuffer(lib) {
 
 // ---- playback preferences ----
 
-const PREF_DEFAULTS = { metronome: true, flash: false };
+const PREF_DEFAULTS = {
+  metronome: true,
+  flash: false,
+  // Which cue lanes are visible. Per user, per device — never part of a song,
+  // so hiding the lyrics on your tablet doesn't hide them for the bass player.
+  laneChords: true,
+  laneLyric: true,
+  laneDirection: true,
+};
 
 export function loadPrefs() {
   try {

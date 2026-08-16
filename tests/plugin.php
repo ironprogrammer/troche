@@ -57,7 +57,16 @@ $song = array(
 	'name'       => 'Test Song',
 	'bpm'        => 120,
 	'musicalKey' => 'A♭',
-	'parts'      => array( array( 'id' => 'p1', 'name' => 'Intro', 'measures' => 4, 'cue' => 'line one' ) ),
+	'parts'      => array(
+		array(
+			'id'        => 'p1',
+			'name'      => 'Intro',
+			'measures'  => 4,
+			'chords'    => '| A♭ | B♭m |',
+			'lyric'     => 'line one',
+			'direction' => 'half-time feel',
+		),
+	),
 );
 
 // ---- read gate ----

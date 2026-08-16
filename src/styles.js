@@ -60,6 +60,21 @@ export const styles = {
 export const css = `
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Spline+Sans+Mono:wght@400;500;600&display=swap');
 
+/* Spline Sans Mono has no ♭ or ♯, so those characters already fall through to
+   whatever symbol face the OS happens to pick — which is why they land small
+   and faint beside the letters. Claiming just those three codepoints pins the
+   fallback and scales it: size-adjust applies to this face alone, so the
+   accidentals grow while B, D and | keep their metrics. It's the only way to
+   size individual characters inside an <input>. Needs Safari 16.4+; older
+   engines just render them at normal size, which is the pre-existing look. */
+@font-face {
+  font-family: 'TrocheAccidental';
+  src: local('Apple Symbols'), local('Segoe UI Symbol'), local('Arial Unicode MS'),
+       local('DejaVu Sans'), local('Noto Music'), local('Symbola');
+  unicode-range: U+266D, U+266F, U+00B0;
+  size-adjust: 165%;
+}
+
 :root {
   --bg: #faf8f4;
   --chrome: rgba(250,248,244,.85);
@@ -68,6 +83,11 @@ export const css = `
   --line: #e6e0d6;
   --card: #fff;
   --accent: #d8483b;
+  /* Grey, but pulled toward ink so a direction doesn't read as disabled. */
+  --direction-ink: #545049;
+  /* Height of a part's name row. The grip and the tools flank it and center
+     against it, so it's shared rather than restated in three places. */
+  --namerow-h: 26px;
 }
 
 * { box-sizing: border-box; }
@@ -217,6 +237,12 @@ select.sa-input { padding-right: 28px; appearance: none; -webkit-appearance: non
 .sa-meta-summary:hover { color: var(--ink); }
 .sa-meta-summary svg { flex-shrink: 0; opacity: .6; }
 .sa-meta-summary-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Pushed to the far end so it holds one position whether the summary beside it
+   is the full meta line or the shorter open-state label. */
+.sa-meta-summary-len {
+  margin-left: auto; flex-shrink: 0; padding-left: 10px;
+  font-variant-numeric: tabular-nums;
+}
 .sa-meta-summary.open {
   color: var(--ink-dim); font-family: inherit; font-weight: 600;
   font-size: 10px; letter-spacing: .14em; text-transform: uppercase;
@@ -393,14 +419,21 @@ select.sa-input { padding-right: 28px; appearance: none; -webkit-appearance: non
   border-right: 3px solid var(--clr);
   box-shadow: 0 0 12px color-mix(in srgb, var(--clr) 45%, transparent);
 }
+/* Top-aligned: with up to three cue lanes the main column is taller than the
+   bar count, and centering everything against it floats the controls. */
 .sa-block-inner {
   position: relative;
-  display: flex; align-items: center; gap: 12px;
+  display: flex; align-items: flex-start; gap: 12px;
   padding: 12px 14px;
 }
+/* Both flanking columns center themselves against the name row rather than
+   the whole (variable-height) block. Sizing them to --namerow-h says that
+   once, instead of hand-tuned top padding that has to be re-tuned every time
+   the name's type changes. */
 .sa-grip {
-  color: var(--ink-dim); display: flex; opacity: .5;
-  cursor: grab; touch-action: none; padding: 4px; margin: -4px;
+  color: var(--ink-dim); display: flex; align-items: center; opacity: .5;
+  height: var(--namerow-h);
+  cursor: grab; touch-action: none; padding: 0 4px; margin: 0 -4px;
 }
 .sa-grip:hover { opacity: 1; }
 .sa-grip:active { cursor: grabbing; }
@@ -416,46 +449,114 @@ select.sa-input { padding-right: 28px; appearance: none; -webkit-appearance: non
 }
 .sa-measures:focus { outline: none; border-color: var(--clr); }
 
-.sa-block-main { flex: 1; min-width: 0; }
+.sa-block-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+/* Explicit line-height, not normal, so the name row is exactly --namerow-h
+   at both the desktop and mobile font sizes, and the grip and tools stay put
+   across the breakpoint. */
 .sa-partname {
   font-family: 'Outfit', sans-serif; font-size: 18px; font-weight: 600;
+  line-height: 22px;
   border: none; background: transparent; color: var(--ink);
   width: 100%; padding: 2px 0; letter-spacing: -.01em;
 }
 .sa-partname:focus { outline: none; }
 /* Locked during playback, but this is exactly when the chart has to be most
    readable — so no dimming. WebKit greys disabled input text via text-fill,
-   which opacity/color alone don't override. */
-.sa-partname:disabled, .sa-cue:disabled {
-  opacity: 1; color: var(--ink); -webkit-text-fill-color: var(--ink);
+   which opacity/color alone don't override. Each lane restates its own color
+   because -webkit-text-fill-color doesn't inherit from a shared rule. */
+.sa-partname:disabled { opacity: 1; color: var(--ink); -webkit-text-fill-color: var(--ink); }
+.sa-laneinput:disabled { opacity: 1; }
+.sa-laneinput.chords:disabled,
+.sa-laneinput.lyric:disabled { color: var(--ink); -webkit-text-fill-color: var(--ink); }
+.sa-laneinput.direction:disabled { -webkit-text-fill-color: var(--direction-ink); }
+.sa-laneinput:disabled:hover { border-bottom-color: transparent; }
+
+/* The three cue lanes. No labels: typography and the gutter icon carry the
+   identity, and labels would cost width the phone layout hasn't got. */
+.sa-namerow { display: flex; align-items: center; gap: 8px; min-width: 0; min-height: var(--namerow-h); }
+.sa-lanes { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.sa-lane {
+  display: grid; grid-template-columns: 15px minmax(0, 1fr);
+  align-items: center; gap: 8px; min-width: 0;
 }
-.sa-cue:disabled:hover { border-bottom-color: transparent; }
-/* The prompt is noise on a field you can't type in — and the inherited
-   text-fill above would otherwise render it in full ink. */
-.sa-cue:disabled::placeholder { -webkit-text-fill-color: transparent; }
-.sa-block-sub {
-  display: flex; align-items: center; gap: 10px;
-  font-size: 12px; color: var(--ink-dim);
-  font-family: 'Spline Sans Mono', monospace;
+.sa-lane-mark { display: grid; place-items: center; color: var(--ink-dim); opacity: .45; }
+.sa-laneinput {
+  width: 100%; min-width: 0;
+  background: transparent; border: none;
+  border-bottom: 1px dashed transparent;
+  padding: 2px 0; color: var(--ink);
+  transition: border-color .15s;
+  --ph: transparent;
+  /* Wraps rather than clipping. field-sizing grows the box to fit the text —
+     where it isn't supported the rows={1} textarea just renders a single
+     clipped line, which is the behavior this replaced. */
+  field-sizing: content;
+  resize: none; overflow: hidden;
+  display: block; font: inherit; line-height: 1.35;
 }
-.sa-cue {
-  flex: 1; min-width: 0;
-  font-family: 'Spline Sans Mono', monospace; font-size: 12px;
-  color: var(--ink); background: transparent;
-  border: none; border-bottom: 1px dashed transparent;
-  padding: 2px 0; transition: border-color .15s;
+.sa-laneinput:hover { border-bottom-color: var(--line); }
+/* Prompts only on the block you're working in. Three of them on every part is
+   a wall of grey down the whole chart at rest, and the gutter icon already
+   says which lane is which — the placeholder is only useful once you're
+   actually in the field. Custom properties inherit into ::placeholder, so the
+   reveal is a single declaration.
+   Scoped to .sa-block, not .sa-block-inner, so the sample field down in the
+   expanded editor behaves the same way. */
+.sa-laneinput::placeholder {
+  color: var(--ph); opacity: .65; font-style: italic;
+  transition: color .15s;
 }
-.sa-cue::placeholder { color: var(--ink-dim); opacity: .7; font-style: italic; }
-.sa-cue:hover { border-bottom-color: var(--line); }
-.sa-cue:focus { outline: none; border-bottom-color: var(--clr); }
+.sa-input.sample { --ph: transparent; }
+.sa-input.sample::placeholder { color: var(--ph); transition: color .15s; }
+.sa-laneinput:focus { outline: none; border-bottom-color: var(--clr); --ph: var(--ink-dim); }
+.sa-input.sample:focus { --ph: var(--ink-dim); }
+@media (hover: hover) {
+  .sa-block:hover .sa-laneinput,
+  .sa-block:hover .sa-input.sample { --ph: var(--ink-dim); }
+}
+
+.sa-laneinput.chords {
+  font-family: 'TrocheAccidental', 'Spline Sans Mono', monospace;
+  font-size: 13px; font-weight: 600; letter-spacing: .02em;
+}
+.sa-laneinput.lyric { font-family: 'Outfit', sans-serif; font-size: 14px; }
+/* Matched to the lyric's size — at 12.5px the italic was doing all the work
+   and it read as disabled text rather than a direction. */
+.sa-laneinput.direction {
+  font-family: 'Outfit', sans-serif; font-size: 14px; font-style: italic;
+  color: var(--direction-ink);
+}
+
+/* Chord entry helpers, shown only while the chords lane holds focus. */
+.sa-chordhelp {
+  display: flex; align-items: center; gap: 4px; flex-wrap: wrap;
+  padding: 5px 0 3px 23px;
+}
+.sa-chordbtn {
+  display: inline-flex; align-items: center; justify-content: center;
+  font-family: 'TrocheAccidental', 'Spline Sans Mono', monospace;
+  font-size: 13px; font-weight: 600; line-height: 1;
+  min-width: 26px; height: 24px; padding: 0 6px;
+  border: 1px solid var(--line); background: var(--card); color: var(--ink);
+  border-radius: 6px; cursor: pointer;
+}
+.sa-chordbtn:hover { border-color: var(--clr); color: var(--clr); background: var(--bg); }
+/* ♭ ♯ ° are scaled by the TrocheAccidental face, so no per-glyph sizes here.
+   A lone ° centered in a square still reads better off its superscript
+   height; inside the chords lane it stays raised, where convention wants it. */
+.sa-chordbtn.deg .g { display: block; transform: translateY(3px); }
+
 .sa-samplelink {
   flex-shrink: 0;
   display: inline-flex; align-items: center; gap: 3px;
+  font-family: 'Spline Sans Mono', monospace; font-size: 12px;
   color: var(--accent); text-decoration: none;
 }
 .sa-samplelink:hover { text-decoration: underline; }
 
-.sa-block-tools { display: flex; align-items: center; gap: 6px; }
+.sa-lanetoggles { display: inline-flex; align-items: center; gap: 8px; }
+
+.sa-block-tools { display: flex; align-items: center; gap: 6px; height: var(--namerow-h); }
 .sa-config {
   display: inline-flex; align-items: center; gap: 7px;
   border: 1px solid var(--line); background: var(--card);
@@ -547,17 +648,58 @@ input[type=number]::-webkit-inner-spin-button { opacity: .4; }
   .sa-config { padding: 0 8px; }
   .sa-status .cell b { font-size: 24px; }
   .sa-status .beatgroup { gap: 12px; }
+  /* Make room for the bar/beat readout on the transport row rather than
+     letting it wrap to one of its own. Two things give: the Stop button drops
+     to an icon-only square (only while playing — idle still reads "Play"),
+     and the COUNT-IN chip goes, since .countin already turns the numerals red
+     and that's the same signal in none of the width. */
+  .sa-play.stop { min-width: 42px; padding: 11px 0; }
+  .sa-play.stop .sa-play-label { display: none; }
+  .sa-status .tag { display: none; }
+  /* Give the lanes the block's whole width rather than the narrow middle
+     column: they run under the bar count on one side and the tools and grip on
+     the other, which is otherwise dead space on a phone. Roughly doubles the
+     room, so chord lines, lyrics, and the helper row all sit on one line at
+     their natural size. display:contents promotes .sa-namerow and .sa-lanes to
+     grid items, so the markup stays as it is on desktop. */
+  .sa-block-inner {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    grid-template-areas:
+      "measures name  tools grip"
+      "lanes    lanes lanes lanes";
+    align-items: start; column-gap: 12px; row-gap: 4px;
+  }
+  .sa-block-main { display: contents; }
+  .sa-measures { grid-area: measures; }
+  .sa-namerow { grid-area: name; }
+  .sa-block-tools { grid-area: tools; }
+  .sa-grip { grid-area: grip; }
+  .sa-lanes { grid-area: lanes; }
+
+  /* Ten 24px chips need 294px and the panel gives 276, so the tenth wrapped
+     alone. Two rows of five instead: no widow at any width, and the chips grow
+     into proper tap targets rather than shrinking to squeeze onto one line. */
+  /* flex:1 because .sa-editor-row sizes its items to content, and a grid of
+     1fr columns holding width:100% children has no intrinsic width to report. */
+  .sa-palette { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; flex: 1; min-width: 0; }
+  .sa-palettebtn { width: 100%; height: 38px; }
   .sa-input.name { width: 100%; min-width: 160px; }
   /* icon-only header buttons on narrow screens — text takes too much room
      and we need Import/Export/Share/Save to all fit on one line */
   .sa-btn-text { display: none; }
   .sa-btn { padding: 7px 10px; }
-  /* drop the bars sub-label; the time is the part that matters */
-  .sa-length-bars { display: none; }
+  /* The whole idle length readout moves up to the meta summary line: Play plus
+     five 42px squares already fills the row, and phone work is small tweaks to
+     an existing chart rather than building one out, so the bar count isn't
+     worth a line of its own either. Playback still fills this space with the
+     bar/beat counter. */
+  .sa-length-inline { display: none; }
   /* tighten the header bands so form blocks get more room */
   .sa-metarow { gap: 10px; padding: 8px 18px 10px; }
-  .sa-transport { padding: 8px 18px; gap: 12px; }
-  .sa-statuswrap { min-height: 40px; }
+  .sa-transport { padding: 8px 10px; gap: 8px; flex-wrap: wrap; }
+  .sa-lanetoggles { gap: 8px; }
+  .sa-statuswrap { min-height: 40px; justify-content: flex-end; }
 }
 
 /* ---- print chart (browser Print / ⌘P) ----
@@ -620,10 +762,19 @@ input[type=number]::-webkit-inner-spin-button { opacity: .4; }
     font-family: 'Outfit', sans-serif; font-size: 15px; font-weight: 700;
     letter-spacing: -.01em; line-height: 1.05; color: #000;
   }
+  /* One line per filled cue lane, stacked the way they are on screen — which
+     is also what a chart looks like on paper. Solid black for the two that
+     carry musical content; the direction stays grey and italic. */
   .sa-print-cue {
     margin-top: 1px; font-family: 'Spline Sans Mono', monospace; font-size: 11px;
     color: #555; line-height: 1.25;
   }
+  .sa-print-cue.chords {
+    font-family: 'TrocheAccidental', 'Spline Sans Mono', monospace;
+    font-size: 12px; font-weight: 600; color: #000;
+  }
+  .sa-print-cue.lyric { font-family: 'Outfit', sans-serif; font-size: 11.5px; color: #000; }
+  .sa-print-cue.direction { font-family: 'Outfit', sans-serif; font-size: 11.5px; font-style: italic; }
   .sa-print-sig { font-weight: 700; color: #000; margin-right: 4px; }
 }
 
@@ -634,9 +785,16 @@ input[type=number]::-webkit-inner-spin-button { opacity: .4; }
    untouched. Selects are exempt (they open a picker, not a keyboard) and
    .sa-partname is already 16px+ at every width. Each selector is
    element-qualified to outrank the class rule that sets its smaller size. */
+/* iOS zooms the page whenever you focus a field under 16px, and won't zoom
+   back out — so every editable field has to clear that bar on touch. Each lane
+   sets its own size through a two-class selector, which outranks a bare
+   input.sa-laneinput no matter where it sits in the sheet; the guard has to
+   match that specificity or it silently loses and the zoom comes back. */
 @media (pointer: coarse) {
   input.sa-input,
   input.sa-input.sample,
-  input.sa-cue { font-size: 16px; }
+  textarea.sa-laneinput.chords,
+  textarea.sa-laneinput.lyric,
+  textarea.sa-laneinput.direction { font-size: 16px; }
 }
 `;

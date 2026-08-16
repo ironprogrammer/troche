@@ -1,17 +1,19 @@
 import React, { useEffect, useRef, useState } from "react";
 import { GripVertical, Link2, Settings2, Trash2, Copy, X } from "lucide-react";
-import { PALETTE, TIME_SIGS } from "../constants.js";
+import { PALETTE, TIME_SIGS, CHORD_HELPERS, CUE_LANES } from "../constants.js";
 import { partSig, sigKey } from "../utils.js";
 import { NumberInput } from "./NumberInput.jsx";
 
 export const PartBlock = React.forwardRef(function PartBlock(
-  { part, index, song, active, progress, playing, autoFocusName, onAutoFocused, onUpdate, onRemove, onDuplicate, onMove },
+  { part, index, song, active, progress, playing, lanes, autoFocusName, onAutoFocused, onUpdate, onRemove, onDuplicate, onMove },
   ref
 ) {
   const [editing, setEditing] = useState(false);
   const [dragging, setDragging] = useState(false);
+  const [chordsFocused, setChordsFocused] = useState(false);
   const blockRef = useRef(null);
   const nameRef = useRef(null);
+  const chordsRef = useRef(null);
 
   const eff = partSig(part, song);
   const hasOverride = part.sigTop != null && part.sigBottom != null;
@@ -25,10 +27,31 @@ export const PartBlock = React.forwardRef(function PartBlock(
 
   // Playback collapses the editors: the settings in there can't be changed
   // mid-song anyway, and the expanded panel just pushes the parts you're
-  // actually reading off the screen.
+  // actually reading off the screen. The chord helper row goes with them —
+  // it's only useful while you're in the field it types into.
   useEffect(() => {
-    if (playing) setEditing(false);
+    if (playing) {
+      setEditing(false);
+      setChordsFocused(false);
+    }
   }, [playing]);
+
+  // Insert a symbol at the caret and hand focus straight back, so tapping a
+  // helper never breaks the flow of typing a progression.
+  const insertChord = (ch) => {
+    const el = chordsRef.current;
+    if (!el) return;
+    const start = el.selectionStart ?? el.value.length;
+    const end = el.selectionEnd ?? start;
+    const next = el.value.slice(0, start) + ch + el.value.slice(end);
+    onUpdate({ chords: next });
+    requestAnimationFrame(() => {
+      try {
+        el.focus();
+        el.setSelectionRange(start + ch.length, start + ch.length);
+      } catch {}
+    });
+  };
 
   useEffect(() => {
     if (autoFocusName && nameRef.current) {
@@ -117,37 +140,91 @@ export const PartBlock = React.forwardRef(function PartBlock(
         />
 
         <div className="sa-block-main">
-          <input
-            ref={nameRef}
-            className="sa-partname"
-            value={part.name}
-            disabled={playing}
-            onChange={(e) => onUpdate({ name: e.target.value })}
-            onFocus={(e) => {
-              // Defer past the mousedown→mouseup that would otherwise place a
-              // caret and undo the selection.
-              const t = e.target;
-              requestAnimationFrame(() => { try { t.select(); } catch {} });
-            }}
-          />
-          <div className="sa-block-sub">
+          <div className="sa-namerow">
+            <input
+              ref={nameRef}
+              className="sa-partname"
+              value={part.name}
+              disabled={playing}
+              onChange={(e) => onUpdate({ name: e.target.value })}
+              onFocus={(e) => {
+                // Defer past the mousedown→mouseup that would otherwise place a
+                // caret and undo the selection.
+                const t = e.target;
+                requestAnimationFrame(() => { try { t.select(); } catch {} });
+              }}
+            />
             {differs && (
               <span className="sa-sigbadge" title="Part time signature">
                 {eff.top}/{eff.bottom}
               </span>
             )}
-            <input
-              className="sa-cue"
-              placeholder="cue / note…"
-              value={part.cue || ""}
-              disabled={playing}
-              onChange={(e) => onUpdate({ cue: e.target.value })}
-            />
             {part.sample && (
               <a className="sa-samplelink" href={part.sample} target="_blank" rel="noreferrer">
                 <Link2 size={12} /> sample
               </a>
             )}
+          </div>
+
+          {/* Chords, lyric cue, and performance direction — the three layers a
+              paper chart already keeps apart. Each is hidden globally by its
+              header toggle, and an empty one collapses during playback so a
+              sparse part stays compact on stage. */}
+          <div className="sa-lanes">
+            {CUE_LANES.map(({ key, label, icon: Icon, placeholder }) => {
+              if (!lanes[key]) return null;
+              const value = part[key] || "";
+              if (playing && !value) return null;
+              const isChords = key === "chords";
+              return (
+                <React.Fragment key={key}>
+                  <div className="sa-lane">
+                    <span className="sa-lane-mark" aria-hidden="true"><Icon size={12} /></span>
+                    {/* A textarea, not an input, purely so a long line wraps
+                        instead of clipping at the right edge — a progression
+                        you can't see the end of is unusable on a phone.
+                        Enter is swallowed so a lane stays one logical line and
+                        nothing downstream has to handle newlines. */}
+                    <textarea
+                      ref={isChords ? chordsRef : undefined}
+                      className={`sa-laneinput ${key}`}
+                      rows={1}
+                      placeholder={placeholder}
+                      aria-label={label}
+                      value={value}
+                      disabled={playing}
+                      onChange={(e) => onUpdate({ [key]: e.target.value })}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          e.currentTarget.blur();
+                        }
+                      }}
+                      onFocus={isChords ? () => setChordsFocused(true) : undefined}
+                      onBlur={isChords ? () => setChordsFocused(false) : undefined}
+                    />
+                  </div>
+                  {isChords && chordsFocused && (
+                    <div className="sa-chordhelp">
+                      {CHORD_HELPERS.map(({ ch, tip, cls }) => (
+                        <button
+                          key={ch}
+                          className={`sa-chordbtn ${cls}`}
+                          title={tip}
+                          aria-label={`Insert ${tip.toLowerCase()}`}
+                          // mousedown, not click: the button must not steal
+                          // focus from the input it's typing into, and blur
+                          // would close this row before click ever fired.
+                          onMouseDown={(e) => { e.preventDefault(); insertChord(ch); }}
+                        >
+                          <span className="g">{ch}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </React.Fragment>
+              );
+            })}
           </div>
         </div>
 

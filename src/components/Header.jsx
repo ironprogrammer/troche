@@ -79,7 +79,7 @@ export function Header({
   onSwitch, onNew, onDelete, onExportLibrary, onExportSong, onImport,
   onSave, onReset, onShare, shareFlash,
   setField, updateSong,
-  wpMode, isMobile, saveState, loginUrl, onReload,
+  wpMode, isMobile, saveState, loginUrl, onReload, lengthLabel,
 }) {
   // WP mode on a phone drops the Share/Export/Import row: autosave makes it
   // redundant and the row costs a full line of scarce vertical space. It stays
@@ -296,6 +296,11 @@ export function Header({
             <span className="sa-meta-summary-text">
               {metaOpen ? "Song meta" : metaSummary}
             </span>
+            {/* Song length lives here on a phone rather than in the transport,
+                where it was the one item that couldn't fit beside Play and the
+                five toggles and pushed the whole row to wrap. Kept out of
+                metaSummary so it survives the open state too. */}
+            <span className="sa-meta-summary-len">{lengthLabel}</span>
           </button>
           {metaOpen && <div className="sa-metarow">{metaFields}</div>}
         </>

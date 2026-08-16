@@ -1,7 +1,9 @@
 import { Play, Square, Volume2, VolumeX, Zap, ZapOff } from "lucide-react";
+import { CUE_LANES } from "../constants.js";
 
 export function Transport({
   playing, togglePlay, metronome, setMetronome, flash, setFlash,
+  lanes, toggleLane,
   inCountIn, activePartId, curMeasure, curBeat, ciBeat,
   totalBeats, lengthLabel, barsLabel,
 }) {
@@ -13,7 +15,7 @@ export function Transport({
         disabled={totalBeats <= 0}
       >
         {playing ? <Square size={16} fill="currentColor" /> : <Play size={16} fill="currentColor" />}
-        {playing ? "Stop" : "Play"}
+        <span className="sa-play-label">{playing ? "Stop" : "Play"}</span>
       </button>
 
       <button
@@ -34,6 +36,30 @@ export function Transport({
       >
         {flash ? <Zap size={16} /> : <ZapOff size={16} />}
       </button>
+
+      {/* Cue lane visibility. Same square as the click and flash toggles —
+          these answer the same question those do: how do I want to read the
+          chart while I play? Stays live during playback, which is exactly
+          when you'd want to drop a lane. */}
+      <div className="sa-lanetoggles" role="group" aria-label="Cue lanes">
+        {CUE_LANES.map(({ key, label, icon: Icon }) => {
+          const on = lanes[key];
+          return (
+            <button
+              key={key}
+              className={`sa-metro ${on ? "on" : ""}`}
+              onClick={() => toggleLane(key)}
+              title={`${label} lane ${on ? "on — tap to hide" : "off — tap to show"}`}
+              // Name the thing, not the action: aria-pressed already announces
+              // which way it's set, and "Show…" contradicts it while on.
+              aria-label={`${label} lane`}
+              aria-pressed={on}
+            >
+              <Icon size={16} />
+            </button>
+          );
+        })}
+      </div>
 
       <div className="sa-statuswrap">
         {playing ? (
