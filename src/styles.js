@@ -237,6 +237,12 @@ select.sa-input { padding-right: 28px; appearance: none; -webkit-appearance: non
 .sa-meta-summary:hover { color: var(--ink); }
 .sa-meta-summary svg { flex-shrink: 0; opacity: .6; }
 .sa-meta-summary-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Pushed to the far end so it holds one position whether the summary beside it
+   is the full meta line or the shorter open-state label. */
+.sa-meta-summary-len {
+  margin-left: auto; flex-shrink: 0; padding-left: 10px;
+  font-variant-numeric: tabular-nums;
+}
 .sa-meta-summary.open {
   color: var(--ink-dim); font-family: inherit; font-weight: 600;
   font-size: 10px; letter-spacing: .14em; text-transform: uppercase;
@@ -641,14 +647,14 @@ input[type=number]::-webkit-inner-spin-button { opacity: .4; }
      and we need Import/Export/Share/Save to all fit on one line */
   .sa-btn-text { display: none; }
   .sa-btn { padding: 7px 10px; }
-  /* drop the bars sub-label; the time is the part that matters */
-  .sa-length-bars { display: none; }
+  /* The whole idle length readout moves up to the meta summary line: Play plus
+     five 42px squares already fills the row, and phone work is small tweaks to
+     an existing chart rather than building one out, so the bar count isn't
+     worth a line of its own either. Playback still fills this space with the
+     bar/beat counter. */
+  .sa-length-inline { display: none; }
   /* tighten the header bands so form blocks get more room */
   .sa-metarow { gap: 10px; padding: 8px 18px 10px; }
-  /* Play plus five 42px squares only fits a ~390px row at this gap and
-     padding. What gives instead is the length readout, which wraps to its own
-     line while idle — and is replaced by the bar/beat counter during playback
-     anyway, so mid-song the row stays single. */
   .sa-transport { padding: 8px 10px; gap: 8px; flex-wrap: wrap; }
   .sa-lanetoggles { gap: 8px; }
   .sa-statuswrap { min-height: 40px; justify-content: flex-end; }

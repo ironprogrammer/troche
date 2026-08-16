@@ -629,6 +629,7 @@ export default function App() {
           updateSong={updateSong}
           wpMode={wpMode}
           isMobile={isMobile}
+          lengthLabel={lengthLabel}
           saveState={saveState}
           loginUrl={loginUrl}
           onReload={() => window.location.reload()}
