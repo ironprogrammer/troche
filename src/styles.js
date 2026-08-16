@@ -656,6 +656,27 @@ input[type=number]::-webkit-inner-spin-button { opacity: .4; }
   .sa-play.stop { min-width: 42px; padding: 11px 0; }
   .sa-play.stop .sa-play-label { display: none; }
   .sa-status .tag { display: none; }
+  /* Give the lanes the block's whole width rather than the narrow middle
+     column: they run under the bar count on one side and the tools and grip on
+     the other, which is otherwise dead space on a phone. Roughly doubles the
+     room, so chord lines, lyrics, and the helper row all sit on one line at
+     their natural size. display:contents promotes .sa-namerow and .sa-lanes to
+     grid items, so the markup stays as it is on desktop. */
+  .sa-block-inner {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    grid-template-areas:
+      "measures name  tools grip"
+      "lanes    lanes lanes lanes";
+    align-items: start; column-gap: 12px; row-gap: 4px;
+  }
+  .sa-block-main { display: contents; }
+  .sa-measures { grid-area: measures; }
+  .sa-namerow { grid-area: name; }
+  .sa-block-tools { grid-area: tools; }
+  .sa-grip { grid-area: grip; }
+  .sa-lanes { grid-area: lanes; }
+
   /* Ten 24px chips need 294px and the panel gives 276, so the tenth wrapped
      alone. Two rows of five instead: no widow at any width, and the chips grow
      into proper tap targets rather than shrinking to squeeze onto one line. */
