@@ -50,7 +50,9 @@ export function Transport({
               className={`sa-metro ${on ? "on" : ""}`}
               onClick={() => toggleLane(key)}
               title={`${label} lane ${on ? "on — tap to hide" : "off — tap to show"}`}
-              aria-label={`Show ${label.toLowerCase()} lane`}
+              // Name the thing, not the action: aria-pressed already announces
+              // which way it's set, and "Show…" contradicts it while on.
+              aria-label={`${label} lane`}
               aria-pressed={on}
             >
               <Icon size={16} />
