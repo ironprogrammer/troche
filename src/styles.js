@@ -487,14 +487,20 @@ select.sa-input { padding-right: 28px; appearance: none; -webkit-appearance: non
    a wall of grey down the whole chart at rest, and the gutter icon already
    says which lane is which — the placeholder is only useful once you're
    actually in the field. Custom properties inherit into ::placeholder, so the
-   reveal is a single declaration. */
+   reveal is a single declaration.
+   Scoped to .sa-block, not .sa-block-inner, so the sample field down in the
+   expanded editor behaves the same way. */
 .sa-laneinput::placeholder {
   color: var(--ph); opacity: .65; font-style: italic;
   transition: color .15s;
 }
+.sa-input.sample { --ph: transparent; }
+.sa-input.sample::placeholder { color: var(--ph); transition: color .15s; }
 .sa-laneinput:focus { outline: none; border-bottom-color: var(--clr); --ph: var(--ink-dim); }
+.sa-input.sample:focus { --ph: var(--ink-dim); }
 @media (hover: hover) {
-  .sa-block-inner:hover .sa-laneinput { --ph: var(--ink-dim); }
+  .sa-block:hover .sa-laneinput,
+  .sa-block:hover .sa-input.sample { --ph: var(--ink-dim); }
 }
 
 .sa-laneinput.chords {
