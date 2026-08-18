@@ -51,4 +51,10 @@ if grep -q '^FAIL' "$WORK/result.txt"; then
   echo "ZIP INSTALL TEST: FAILED"
   exit 1
 fi
+# A PHP fatal mid-run writes no FAIL line, it just stops appending. Require the
+# summary line the harness writes last, so a truncated run can't read as a pass.
+if ! grep -q '^=== .* passed, .* failed ===$' "$WORK/result.txt"; then
+  echo "ZIP INSTALL TEST: FAILED (run ended early — no summary line)"
+  exit 1
+fi
 echo "ZIP INSTALL TEST: PASSED"
