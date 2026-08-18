@@ -118,6 +118,13 @@ class Admin {
 			if ( ! $user ) {
 				continue;
 			}
+			// Administrators hold troche_edit through their role and are never
+			// rendered in the checklist, so an id for one can only have been
+			// hand-crafted. Skip them so this handler only ever acts on the
+			// users the screen actually offered.
+			if ( in_array( 'administrator', (array) $user->roles, true ) ) {
+				continue;
+			}
 			if ( in_array( $user_id, $granted, true ) ) {
 				$user->add_cap( Store::CAP_EDIT );
 			} else {
