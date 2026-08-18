@@ -141,6 +141,20 @@ $noid   = troche_rest( 'GET', '/troche/v1/library' )->get_data()['songs'];
 $last   = end( $noid );
 check( 'server assigns an id when one is missing', ! empty( $last['id'] ) && is_string( $last['id'] ) );
 
+// ---- sanitize_song ----
+$dirty = \Troche\Store::sanitize_song(
+	array(
+		'name'          => 'Clean <b>Name</b>',
+		'ti<b>tle</b>x' => 'value',
+		'parts'         => array( array( 'measures' => 4, 'lyric' => "one\ntwo" ) ),
+	)
+);
+check( 'string values are stripped of tags', 'Clean Name' === $dirty['name'] );
+check( 'string keys are stripped of tags', isset( $dirty['titlex'] ) && ! isset( $dirty['ti<b>tle</b>x'] ) );
+check( 'numeric leaves pass through unchanged', 4 === $dirty['parts'][0]['measures'] );
+check( 'list indices are left alone', array( 0 ) === array_keys( $dirty['parts'] ) );
+check( 'newlines in cues survive sanitizing', "one\ntwo" === $dirty['parts'][0]['lyric'] );
+
 // ---- plain-permalinks admin notice ----
 wp_set_current_user( $admin_id );
 $admin_ui = new \Troche\Admin();
@@ -156,6 +170,39 @@ ob_start();
 $admin_ui->maybe_permalink_notice();
 $notice_pretty = ob_get_clean();
 check( 'permalink notice hidden once permalinks are set', '' === trim( $notice_pretty ) );
+
+// ---- settings save: administrators are never cap-toggled ----
+// The checklist never renders administrators (they hold troche_edit through the
+// role), so a candidate list naming one can only be hand-crafted. The save
+// handler skips them, leaving their user-level caps untouched either way.
+// maybe_save() runs on admin_init in production, where add_settings_error() is
+// already loaded; this harness runs outside wp-admin, so pull it in by hand.
+require_once ABSPATH . 'wp-admin/includes/template.php';
+function troche_save_post( $candidates, $granted ) {
+	global $admin_ui;
+	$_POST = array(
+		'troche_nonce'      => wp_create_nonce( 'troche_save' ),
+		'troche_slug'       => \Troche\App::get_slug(),
+		'troche_candidates' => $candidates,
+		'troche_edit_users' => $granted,
+	);
+	// check_admin_referer() reads $_REQUEST, which PHP populates for a real request.
+	$_REQUEST = $_POST;
+	$admin_ui->maybe_save();
+	$_POST    = array();
+	$_REQUEST = array();
+}
+
+check( 'capped subscriber has troche_edit before the save', user_can( $sub_id, 'troche_edit' ) );
+// Admin checked: must not gain a user-level grant (the role already covers it).
+troche_save_post( array( $admin_id, $sub_id ), array( $admin_id ) );
+check( 'admin gains no user-level cap entry when checked', ! array_key_exists( 'troche_edit', ( new WP_User( $admin_id ) )->caps ) );
+check( 'admin still has troche_edit via role', user_can( $admin_id, 'troche_edit' ) );
+check( 'non-admin candidate toggles off', ! user_can( $sub_id, 'troche_edit' ) );
+// Admin unchecked: still no user-level entry, still capable.
+troche_save_post( array( $admin_id, $sub_id ), array( $sub_id ) );
+check( 'admin untouched when unchecked', ! array_key_exists( 'troche_edit', ( new WP_User( $admin_id ) )->caps ) && user_can( $admin_id, 'troche_edit' ) );
+check( 'non-admin candidate toggles back on', user_can( $sub_id, 'troche_edit' ) );
 
 file_put_contents( $out, "\n=== $pass passed, $fail failed ===\n", FILE_APPEND );
 echo 'done';

@@ -244,9 +244,12 @@ class Store {
 
 	/**
 	 * Recursively sanitize a decoded song: strip tags from string leaves,
-	 * leave numbers and booleans intact. Keys are app-controlled and preserved
-	 * as-is (they carry meaning like `timeSigTop`). Newlines are kept so
-	 * multi-line cues survive.
+	 * leave numbers and booleans intact. Newlines are kept so multi-line cues
+	 * survive. String keys are sanitized the same way as values — the app only
+	 * ever sends its own keys (`timeSigTop` and friends), but a non-app caller
+	 * could put arbitrary bytes there, and keys should not be the one part of a
+	 * song that round-trips through storage unfiltered. Integer keys (list
+	 * indices) pass through untouched.
 	 *
 	 * @param mixed $value Raw decoded value.
 	 * @return mixed
@@ -255,6 +258,7 @@ class Store {
 		if ( is_array( $value ) ) {
 			$clean = array();
 			foreach ( $value as $key => $item ) {
+				$key           = is_string( $key ) ? sanitize_textarea_field( $key ) : $key;
 				$clean[ $key ] = self::sanitize_song( $item );
 			}
 			return $clean;
