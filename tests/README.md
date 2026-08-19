@@ -17,3 +17,12 @@ The `test:plugin` and `test:zip` runs use
 [WordPress Playground](https://developer.wordpress.org/playground/) (real
 WordPress on SQLite, no Docker); the first run downloads WordPress. Each runs in
 a fresh, throwaway site.
+
+Both default to the latest WordPress release. Override with `TROCHE_WP` (and
+`TROCHE_PHP`, default `8.5`):
+
+```
+TROCHE_WP=beta npm run test:plugin      # current RC
+TROCHE_WP=nightly npm run test:plugin   # trunk
+TROCHE_WP=7.0 npm run test:plugin       # a specific release
+```

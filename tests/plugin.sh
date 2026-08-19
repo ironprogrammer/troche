@@ -21,9 +21,14 @@ cd "$ROOT"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 cp "$ROOT/tests/plugin.php" "$WORK/checks.php"
-cat > "$WORK/blueprint.json" <<'JSON'
+# Set in the blueprint, not via the CLI's --wp flag, which v1 blueprints ignore.
+WP_VERSION="${TROCHE_WP:-latest}"
+PHP_VERSION="${TROCHE_PHP:-8.5}"
+
+cat > "$WORK/blueprint.json" <<JSON
 {
-  "$schema": "https://playground.wordpress.net/blueprint-schema.json",
+  "\$schema": "https://playground.wordpress.net/blueprint-schema.json",
+  "preferredVersions": { "wp": "$WP_VERSION", "php": "$PHP_VERSION" },
   "steps": [
     { "step": "activatePlugin", "pluginPath": "troche/troche.php" },
     { "step": "runPHP", "code": "<?php require '/work/checks.php';" }
@@ -31,7 +36,7 @@ cat > "$WORK/blueprint.json" <<'JSON'
 }
 JSON
 
-echo "==> Running plugin harness (Playground)"
+echo "==> Running plugin harness (Playground, WordPress $WP_VERSION, PHP $PHP_VERSION)"
 npx --yes @wp-playground/cli@latest run-blueprint \
   --blueprint="$WORK/blueprint.json" \
   --mount="$ROOT/wp-plugin:/wordpress/wp-content/plugins/troche" \

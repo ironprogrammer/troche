@@ -11,6 +11,8 @@ require_once ABSPATH . 'wp-admin/includes/plugin.php';
 
 $out = '/work/result.txt';
 file_put_contents( $out, '' );
+// Record what actually booted — this is what backs the "Tested up to" header.
+file_put_contents( $out, 'ENV: WordPress ' . get_bloginfo( 'version' ) . ', PHP ' . PHP_VERSION . "\n\n", FILE_APPEND );
 $pass = 0;
 $fail = 0;
 function check( $label, $cond ) {
