@@ -26,9 +26,14 @@ WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 cp wp-plugin/troche.zip "$WORK/troche.zip"
 cp "$ROOT/tests/zip-install.php" "$WORK/checks.php"
-cat > "$WORK/blueprint.json" <<'JSON'
+# Set in the blueprint, not via the CLI's --wp flag, which v1 blueprints ignore.
+WP_VERSION="${TROCHE_WP:-latest}"
+PHP_VERSION="${TROCHE_PHP:-8.5}"
+
+cat > "$WORK/blueprint.json" <<JSON
 {
-  "$schema": "https://playground.wordpress.net/blueprint-schema.json",
+  "\$schema": "https://playground.wordpress.net/blueprint-schema.json",
+  "preferredVersions": { "wp": "$WP_VERSION", "php": "$PHP_VERSION" },
   "steps": [
     { "step": "setSiteOptions", "options": { "permalink_structure": "/%postname%/" } },
     { "step": "installPlugin", "pluginData": { "resource": "vfs", "path": "/work/troche.zip" } },
@@ -37,7 +42,7 @@ cat > "$WORK/blueprint.json" <<'JSON'
 }
 JSON
 
-echo "==> Installing the zip into a fresh WordPress (Playground)"
+echo "==> Installing the zip into a fresh WordPress (Playground, WordPress $WP_VERSION, PHP $PHP_VERSION)"
 npx --yes @wp-playground/cli@latest run-blueprint \
   --blueprint="$WORK/blueprint.json" --mount="$WORK:/work" >/dev/null 2>&1 || true
 
