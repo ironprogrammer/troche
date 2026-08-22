@@ -2,39 +2,38 @@
 
 A web-based song-form arranger. Build vertical arrangements of song parts
 (intro, verse, chorus), set measures and per-part time signatures, and play back
-a visual and audible click that scrolls and highlights sections in time. Built
-for sketching arrangements and sharing them with bandmates via JSON
-export/import.
+a visual and audible click that scrolls and highlights sections in time. I built
+it to sketch arrangements and hand them to bandmates as JSON.
 
-Named in a nod toward Lozenger, my band's informal name.
+Named as a nod to Lozenger, my band's informal name.
 
 Live at https://ironprogrammer.github.io/troche/
 
 ## Features
 
 - Vertical arrangement of named, colored parts. Drag to reorder.
-- Per-part time signatures that override the song's master meter, so a 6/8
-  bridge can sit inside a 4/4 song.
-- Playback runs a click metronome with optional count-in, plus a progress fill
-  that highlights and auto-scrolls to the active part.
+- Per-part time signatures override the song's master meter, so a 6/8 bridge
+  can sit inside a 4/4 song.
+- Playback runs a click metronome with an optional count-in. A progress fill
+  highlights the active part and scrolls it into view.
 - An optional full-screen flash on every beat, hard on the downbeat and dim on
   the rest. It runs off the same audio clock as the click, so it can't drift.
   The click and flash toggles persist per device.
 - Multiple songs in one library, with a song switcher and per-song BPM, time
   signature, and count-in bars.
 - Three cue lanes per part: chords, lyric cue, and performance direction. Chords
-  render in mono, the lyric plain, the direction italic. Any lane can be hidden
-  from the transport bar, and that choice persists per device rather than per
-  song. Empty lanes collapse during playback, so a sparse part stays compact.
-  The chords field has caret-insert buttons for `♭ ♯ Δ ° | % /`.
+  render in mono, the lyric plain, the direction italic. Hide any lane from the
+  transport bar, and that choice sticks per device rather than per song. Empty
+  lanes collapse during playback. The chords field has caret-insert buttons for
+  `♭ ♯ Δ ° | % /`.
 - Per-part colors and sample links. Paste an mp3/wav URL on a part as a
-  reference; it opens in a new tab, and the app never plays it.
+  reference. It opens in a new tab, and the app never plays it.
 - Autosave to `localStorage`, plus a Save button that flushes on demand.
 - JSON import and export. Every export uses the same versioned envelope,
-  `{ format: "troche", version: 1, songs: [...] }`, and a single-song export is
-  that shape with one entry. Files are named `*.troche.json`.
+  `{ format: "troche", version: 1, songs: [...] }`. A single-song export is that
+  shape with one entry. Filenames end in `.troche.json`.
 - Share links encode the library in the URL hash (`#data=...`). Opening one
-  merges those songs into your library, and the hash is stripped on load.
+  merges those songs into your library, then strips the hash.
 - Undo when you remove a part (6-second toast).
 
 ## Stack
@@ -69,15 +68,14 @@ Source = GitHub Actions.
 
 ## WordPress plugin
 
-The same app can run from a WordPress site with server-side storage and login
-gating, so bandmates load and save song forms through the site instead of
-passing JSON files around. Without a WordPress host, the app stays
-`localStorage`-only.
+The same app can run from a WordPress site, storing songs on the server behind a
+login, so bandmates load and save through the site instead of passing JSON files
+around. Without WordPress, the app stays `localStorage`-only.
 
 The plugin lives in `wp-plugin/`. It serves the built app behind login, saves
-each song as a revisioned custom post, and exposes it under a URL slug you
-choose (default `/troche`). Viewing requires being logged in. Editing requires a
-capability you grant per user on Settings → Troche.
+each song as a revisioned custom post, and mounts at a URL slug you choose
+(default `/troche`). Viewing requires a login. Editing requires a capability you
+grant per user on Settings → Troche.
 
 ### Build
 
@@ -90,8 +88,8 @@ by GitHub Pages is left untouched.
 
 ### Test locally
 
-Uses [WordPress Playground](https://developer.wordpress.org/playground/): real
-WordPress on SQLite, no Docker, auto-admin login.
+Runs on [WordPress Playground](https://developer.wordpress.org/playground/), so
+there's no Docker and no database to set up.
 
 From the repo root:
 
@@ -102,9 +100,9 @@ npx @wp-playground/cli@latest start --port 9400 \
   --blueprint wp-plugin/.playground/blueprint.json --login
 ```
 
-This mounts and activates the plugin and logs you in as an administrator. Open
+That mounts and activates the plugin and signs you in as an administrator. Open
 <http://127.0.0.1:9400/troche/>, then set the URL slug and editors on Settings →
-Troche. To check the view-vs-edit gates, add a Subscriber user, grant them
+Troche. To check the view and edit gates, add a Subscriber user, grant them
 editing, and sign in as them.
 
 ### Release and install
@@ -120,13 +118,13 @@ git push --tags
 Install or update by uploading `troche.zip` on Plugins → Add New → Upload Plugin
 in wp-admin.
 
-## Notes / known limitations
+## Limitations
 
-- Playback is a visual and click metronome only. It does not play the linked
-  audio samples; those are stored and openable, nothing more.
-- Timing model: one beat is one count at a constant duration set by BPM,
-  regardless of the time-sig denominator. A 6/8 section is 6 counts per bar at
-  the same pulse as 4/4, so the bar gets longer but the pulse doesn't change.
-  The denominator is effectively a label. 6/8 and 6/4 behave identically.
+- Playback is a metronome, visual and audible. It never plays the linked audio
+  samples.
+- One beat is one count at a constant duration set by BPM, whatever the time
+  signature's denominator says. A 6/8 section is 6 counts per bar at the same
+  pulse as 4/4, so the bar gets longer but the pulse doesn't change. The
+  denominator is just a label. 6/8 and 6/4 behave identically.
 - Tempo, time signatures, part measures, reordering, and add/remove are locked
-  during playback by design. It isn't built for live tweaking.
+  during playback. It isn't built for live tweaking.
