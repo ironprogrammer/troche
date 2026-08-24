@@ -4,7 +4,7 @@ Tags: music, band, arrangement, songwriting
 Requires at least: 6.9
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.2.0
+Stable tag: 1.2.1
 License: GPL-2.0-or-later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -66,6 +66,9 @@ Deleted songs go to the trash, and every save is kept as a revision, so you can
 restore either from the dashboard.
 
 == Changelog ==
+
+= 1.2.1 =
+* Remember which song you had selected, so a refresh or a restart comes back to it instead of the last one you edited.
 
 = 1.2.0 =
 * Split each part's cue into three lanes — chords, lyric, and performance direction — each in its own typography, and each one hideable from the transport bar.
