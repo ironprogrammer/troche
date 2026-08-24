@@ -308,6 +308,12 @@ async function doSave(library, opts) {
   }
 }
 
+// Persist just the active-song selection. Buffer-only: no song content
+// changed, so there's nothing to sync to the server.
+export function saveSelection(library) {
+  writeBuffer(library);
+}
+
 // Clear the local buffer (standalone "Reset"). No effect on server data.
 export function clearBuffer() {
   try {
