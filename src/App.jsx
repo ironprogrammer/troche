@@ -7,6 +7,7 @@ import {
   loadLibrary,
   saveLibrary,
   clearBuffer,
+  saveSelection,
   loadPrefs,
   savePrefs,
   wpMode,
@@ -157,6 +158,12 @@ export default function App() {
       next = norm.library;
       if (norm.changed) importedDirty = true;
 
+      // A saved selection can point at a song that's since been deleted
+      // elsewhere; fall back to the first song rather than rendering nothing.
+      if (!next.songs.some((s) => s.id === next.activeId)) {
+        next = { ...next, activeId: next.songs[0].id };
+      }
+
       setLibrary(next);
       if (importedDirty) setDirty(true);
       setLoading(false);
@@ -273,8 +280,12 @@ export default function App() {
 
   // ---- song library operations ----
   const switchSong = (id) => {
+    if (!library) return;
     stop();
-    setLibrary((lib) => ({ ...lib, activeId: id }));
+    const next = { ...library, activeId: id };
+    setLibrary(next);
+    // Write through immediately so a refresh or reboot lands on the same song.
+    saveSelection(next);
   };
 
   const newSong = () => {
